@@ -1,0 +1,50 @@
+name: Build
+
+on: [push, pull_request]
+
+jobs:
+  build-linux:
+    name: "Linux"
+
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: conda-incubator/setup-miniconda@v2
+      with:
+        miniforge-variant: Miniforge3
+        miniforge-version: latest
+        environment-file: environment.yml
+    - name: Install with pip
+      shell: bash -l {0}
+      run: |
+        pip install .
+    - name: Test with pytest
+      shell: bash -l {0}
+      run: |
+        pytest -vv
+
+  build-windows:
+    name: "Windows"
+
+    runs-on: "windows-latest"
+    strategy:
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: conda-incubator/setup-miniconda@v2
+      with:
+        miniforge-variant: Miniforge3
+        miniforge-version: latest
+        environment-file: environment.yml
+    - name: Install with pip
+      shell: cmd /C CALL {0}
+      run: >-
+        pip install .
+    - name: Test with pytest
+      shell: cmd /C CALL {0}
+      run: >-
+        pytest -vv

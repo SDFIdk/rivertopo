@@ -1,0 +1,8 @@
+name: dvrwarp-dev
+channels:
+  - conda-forge
+dependencies:
+  - gdal
+  - scipy
+  - pip
+  - pytest
