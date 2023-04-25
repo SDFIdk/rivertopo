@@ -21,9 +21,8 @@ class RegulativProfilSimpel(ProfilABC):
         self._anlaegvenstre = feature.GetFieldAsDouble('anlaegvenstre')
         self._bundbredde = feature.GetFieldAsDouble('bundbredde')
         self._bundkote = feature.GetFieldAsDouble('bundkote')
-    
-    def interp(self, x):
-        return np.piecewise(
+
+        self._interp = lambda x: np.piecewise(
             x,
             [
                 x < -0.5*self._bundbredde,
@@ -36,6 +35,9 @@ class RegulativProfilSimpel(ProfilABC):
                 lambda x: self._bundkote + (x - 0.5*self._bundbredde)/self._anlaeghoejre if self._anlaeghoejre != 0.0 else np.nan,
             ]
         )
+
+    def interp(self, x):
+        return self._interp(x)
 
 class RegulativProfilSammensat(ProfilABC):
     def __init__(self, feature):
@@ -51,7 +53,7 @@ class RegulativProfilSammensat(ProfilABC):
         self._bundbredde = feature.GetFieldAsDouble('bundbredde')
         self._bundkote = feature.GetFieldAsDouble('bundkote')
 
-    def interp(self, x):
+        # intermediate helper coordinates
         bund_left = -0.5*self._bundbredde
         afsatsvenstre_inner = bund_left - self._anlaegvenstre*(self._afsatskote - self._bundkote)
         afsatsvenstre_outer = afsatsvenstre_inner - self._afsatbanketbreddevenstre # TODO check interpretation
@@ -60,7 +62,7 @@ class RegulativProfilSammensat(ProfilABC):
         afsatshoejre_inner = bund_right + self._anlaeghoejre*(self._afsatskote - self._bundkote)
         afsatshoejre_outer = afsatshoejre_inner + self._afsatbanketbreddehoejre # TODO check interpretation
 
-        return np.piecewise(
+        self._interp = lambda x: np.piecewise(
             x,
             [
                 x < afsatsvenstre_outer,
@@ -81,3 +83,6 @@ class RegulativProfilSammensat(ProfilABC):
                 lambda x: self._afsatskote + (x - afsatshoejre_outer)/self._afsatsanlaeghoejre,
             ]
         )
+
+    def interp(self, x):
+        return self._interp(x)
