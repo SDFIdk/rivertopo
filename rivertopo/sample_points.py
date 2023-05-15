@@ -11,6 +11,38 @@ import random
 gdal.UseExceptions()
 ogr.UseExceptions()
 
+def create_perpendicular_line(point1_geometry, point2_geometry, length):
+    x1, y1 = point1_geometry.GetX(), point1_geometry.GetY()
+    x2, y2 = point2_geometry.GetX(), point2_geometry.GetY()
+
+    # Calculate the slope of the original line
+    dx = x2 - x1
+    dy = y2 - y1
+    if dx == 0:
+        m = float('inf')  # slope is infinity
+    else:
+        m = dy / dx
+
+    # Calculate the slope of the line perpendicular to the original line
+    if m == 0:
+        m_perpendicular = float('inf')
+    else:
+        m_perpendicular = -1 / m
+
+    # Calculate the coordinates of the endpoints of the perpendicular line
+    dx_perpendicular = (length / 2) / ((1 + m_perpendicular**2)**0.5)
+    dy_perpendicular = m_perpendicular * dx_perpendicular
+    x3 = x1 - dx_perpendicular
+    y3 = y1 - dy_perpendicular
+    x4 = x1 + dx_perpendicular
+    y4 = y1 + dy_perpendicular
+
+    # Create the perpendicular line
+    line_geometry = ogr.Geometry(ogr.wkbLineString25D)
+    line_geometry.AddPoint(x3, y3, random.random())
+    line_geometry.AddPoint(x4, y4, random.random())
+
+    return line_geometry
 
 def main():
     argument_parser = argparse.ArgumentParser()
@@ -62,6 +94,12 @@ def main():
             output_line_feature = ogr.Feature(output_lines_layer.GetLayerDefn())
             output_line_feature.SetGeometry(line_geometry)
             output_lines_layer.CreateFeature(output_line_feature)
+
+            # Create a perpendicular line at the midpoint of the original line
+            perpendicular_line_geometry = create_perpendicular_line(point1_geometry, point2_geometry, 10)  # replace 1 with the desired length
+            output_perpendicular_line_feature = ogr.Feature(output_lines_layer.GetLayerDefn())
+            output_perpendicular_line_feature.SetGeometry(perpendicular_line_geometry)
+            output_lines_layer.CreateFeature(output_perpendicular_line_feature)
 
     logging.info(f"processed {len(points)} points and created lines")
 
