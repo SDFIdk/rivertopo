@@ -12,6 +12,9 @@ import profile
 gdal.UseExceptions()
 ogr.UseExceptions()
 
+#create profile classification
+#def profile ()
+
 def create_perpendicular_line(point1_geometry, point2_geometry, length):
     x1, y1 = point1_geometry.GetX(), point1_geometry.GetY()
     x2, y2 = point2_geometry.GetX(), point2_geometry.GetY()
@@ -38,8 +41,14 @@ def create_perpendicular_line(point1_geometry, point2_geometry, length):
     x4 = x1 + dx_perpendicular
     y4 = y1 + dy_perpendicular
 
+    # Loop and determine if it is "sammensat" or "simpel"
+
+    #TODO instead of random.random try to add the interp from profile 
+    z1 = 
     # Create the perpendicular line
     line_geometry = ogr.Geometry(ogr.wkbLineString25D)
+    
+    
     line_geometry.AddPoint(x3, y3, random.random())
     line_geometry.AddPoint(x4, y4, random.random())
 
@@ -85,6 +94,8 @@ def main():
 
             point1_geometry = point1.GetGeometryRef()
             point2_geometry = point2.GetGeometryRef()
+
+            #Compute Z value from profile for lines
 
             #get length for perp line from bundbredde
             #length_crosssection = point_group(key=lambda f: (f.GetField("bundbredde")))
