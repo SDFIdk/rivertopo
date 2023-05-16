@@ -6,6 +6,7 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 
 ogr.UseExceptions()
 
+# TODO Add center coords, azimuth?
 class ProfilABC(metaclass=ABCMeta):
     @abstractmethod
     def __init__(self, feature):
@@ -83,6 +84,39 @@ class RegulativProfilSammensat(ProfilABC):
                 lambda x: self._afsatskote + (x - afsatshoejre_outer)/self._afsatsanlaeghoejre,
             ]
         )
+
+    def interp(self, x):
+        return self._interp(x)
+
+class OpmaaltProfil(ProfilABC):
+    def __init__(self, feature):
+        geometry_ref = feature.GetGeometryRef()
+        geometry_coords = np.array(geometry_ref.GetPoints())
+
+        # Estimate "center" using thalweg?
+        z_min_indices = np.argmin(geometry_coords[:,2])
+        z_min_coords = geometry_coords[z_min_indices,:].reshape(-1, 3) # the reshape is necessary when z_min_indices is a scalar
+        thalweg_coord = np.mean(z_min_coords, axis=0)
+
+        endpoint_left = geometry_coords[0]
+        endpoint_right = geometry_coords[-1]
+
+        # distances between endpoints
+        delta_x = endpoint_right[0] - endpoint_left[0]
+        delta_y = endpoint_right[1] - endpoint_left[1]
+
+        azimuth = np.arctan2(-delta_y, delta_x) # TODO generalize to all profile types
+
+        dists_from_left = np.hypot(
+            geometry_coords[:,0] - endpoint_left[0],
+            geometry_coords[:,1] - endpoint_left[1]
+        )
+        thalweg_dist_from_left = np.hypot(thalweg_coord[0] - endpoint_left[0], thalweg_coord[1] - endpoint_left[1])
+
+        # along-profile x coordinate
+        profile_x = dists_from_left - thalweg_dist_from_left
+
+        self._interp = lambda x: np.interp(x, profile_x, geometry_coords[:,2], left=np.nan, right=np.nan)
 
     def interp(self, x):
         return self._interp(x)

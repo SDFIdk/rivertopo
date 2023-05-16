@@ -1,4 +1,4 @@
-from rivertopo.profile import ProfilABC, RegulativProfilSimpel, RegulativProfilSammensat
+from rivertopo.profile import ProfilABC, RegulativProfilSimpel, RegulativProfilSammensat, OpmaaltProfil
 
 from osgeo import ogr
 import numpy as np
@@ -51,5 +51,27 @@ def test_regulativprofilsammensat(regulativprofilsammensat_layer):
 
     x = np.array([-6.5, -4.5, -3.5, -2.5, -2.0, -1.5, 0.0, 1.5, 2.5, 3.5, 5.0, 6.5, 7.5])
     expected_y = np.array([44.0, 43.0, 43.0, 43.0, 42.5, 42.0, 42.0, 42.0, 42.5, 43.0, 43.0, 43.0, 44.0])
+
+    assert_profile_interp_equal(x, profile, expected_y)
+
+def test_opmaaltprofil(opmaaltprofil_layer):
+    geometry = ogr.Geometry(ogr.wkbLineString25D)
+    geometry.AddPoint(500000.0 + 0.4*(-2), 6200000.0 + 0.3*(-2), 43.5)
+    geometry.AddPoint(500000.0 + 0.4*(-1), 6200000.0 + 0.3*(-1), 42.5)
+    geometry.AddPoint(500000.0, 6200000.0, 42.0) # thalweg (lowest z)
+    geometry.AddPoint(500000.0 + 0.4*1, 6200000.0 + 0.3*1, 43.0)
+    geometry.AddPoint(500000.0 + 0.4*3, 6200000.0 + 0.3*3, 43.5)
+    geometry.AddPoint(500000.0 + 0.4*4, 6200000.0 + 0.3*4, 44.0)
+
+    feature = ogr.Feature(opmaaltprofil_layer.GetLayerDefn())
+    feature.SetGeometry(geometry)
+
+    opmaaltprofil_layer.CreateFeature(feature)
+
+    profile = OpmaaltProfil(feature)
+
+    # avoid testing at endpoints, as rounding may cause them to be in NaN area
+    x = 0.5*np.array([-2.5, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 2.0, 3.0, 3.5, 4.5])
+    expected_y = np.array([np.nan, 43.0, 42.5, 42.25, 42.0, 42.5, 43.0, 43.25, 43.5, 43.75, np.nan])
 
     assert_profile_interp_equal(x, profile, expected_y)
