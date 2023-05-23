@@ -40,3 +40,8 @@ def regulativprofilsammensat_layer(datasrc, srs):
     layer.CreateField(ogr.FieldDefn('bundbredde', ogr.OFTReal))
     layer.CreateField(ogr.FieldDefn('bundkote', ogr.OFTReal))
     return layer
+
+@pytest.fixture()
+def opmaaltprofil_layer(datasrc, srs):
+    layer = datasrc.CreateLayer('opmaaltprofil_nohist', srs=srs, geom_type=ogr.wkbLineString25D)
+    return layer
