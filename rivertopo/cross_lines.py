@@ -13,7 +13,6 @@ from profile import RegulativProfilSimpel, RegulativProfilSammensat, OpmaaltProf
 gdal.UseExceptions()
 ogr.UseExceptions()
 
-
 def main():
     argument_parser = argparse.ArgumentParser()
     argument_parser.add_argument('input_points_simpel', type=str, help='input points vector data source for simpel')
@@ -38,7 +37,7 @@ def main():
             points.append(point_feature)
 
     points.sort(key=lambda f: (f.GetField("laengdeprofillokalid"), f.GetField("regulativstationering")))
-
+    #sample_points = points[:10]
     # Now we group the points based on their ID
     grouped_points = {k: sorted(g, key=lambda f: f.GetField("regulativstationering")) for k, g in groupby(points, key=lambda f: f.GetField("laengdeprofillokalid"))}
 
@@ -51,9 +50,10 @@ def main():
         geom_type=ogr.wkbLineString25D,
     )
     output_lines_layer = output_lines_datasrc.GetLayer()
- 
+    previous_perpendicular_line= []
     # Iterate over each group of points and create a line for each pair of points within the group
     for point_group in grouped_points.values():
+        previous_perpendicular_line = None
         for i in range(len(point_group) - 1):
             point1 = point_group[i]
             point2 = point_group[i + 1]
@@ -110,7 +110,7 @@ def main():
             x4 = x1 + vec_clock[0][0] * length / 2
             y4 = y1 + vec_clock[1][0] * length / 2
             
-            #create x,y values for the perpendicular line
+            #create multiple x,y values for the perpendicular line
             t = np.linspace(0,1)
             x = t* (x4-x3)+x3
             y = t* (y4-y3)+y3
@@ -124,88 +124,30 @@ def main():
             
             # Create a perpendicular normalized line from the interpolated points
             line_geometry = ogr.Geometry(ogr.wkbLineString25D)
+            # Create a perpendicular normalized line from the interpolated points
+            perpendicular_points = []
             for i in range(len(t)):
+                # Calculate coordinates and interpolated z-values for each point
                 x_curr = t[i] * (x4-x3) + x3
                 y_curr = t[i] * (y4-y3) + y3
                 z_curr = (1-t[i]) * z1_values[i] + t[i] * z2_values[i]
-                line_geometry.AddPoint(x_curr, y_curr, float(z_curr))
-                
-                # Create output feature for crosssections
-                output_line_feature = ogr.Feature(output_lines_layer.GetLayerDefn())
-                output_line_feature.SetGeometry(line_geometry)
-                output_lines_layer.CreateFeature(output_line_feature)
+                perpendicular_points.append((x_curr, y_curr, z_curr))
 
-            # Create a linestring between points
-            for i in range(len(z1_values)):
-                line_geometry = ogr.Geometry(ogr.wkbLineString25D)
-                line_geometry.AddPoint(point1_geometry.GetX(), point1_geometry.GetY(), float(z1_values[i]))
-                line_geometry.AddPoint(point2_geometry.GetX(), point2_geometry.GetY(), float(z2_values[i]))
+            if previous_perpendicular_line:  # Only draw lines if there was a previous line
+                for j in range(len(t)):  
+                    point1 = previous_perpendicular_line[j]
+                    point2 = perpendicular_points[j]
 
-                output_lines_feature = ogr.Feature(output_lines_layer.GetLayerDefn())
-                output_lines_feature.SetGeometry(line_geometry)
-                output_lines_layer.CreateFeature(output_lines_feature)
-    
+                    line_geometry = ogr.Geometry(ogr.wkbLineString25D)
+                    line_geometry.AddPoint(point1[0], point1[1], float(point1[2]))
+                    line_geometry.AddPoint(point2[0], point2[1], float(point2[2]))
 
-            # Create a LineString from the two points
-            #line_geometry = ogr.Geometry(ogr.wkbLineString25D)
-            #line_geometry.AddPoint(point1_geometry.GetX(), point1_geometry.GetY(), float(z1_values))
-            #line_geometry.AddPoint(point2_geometry.GetX(), point2_geometry.GetY(), float(z2_values))
+                    # Create output feature for crosssections
+                    output_line_feature = ogr.Feature(output_lines_layer.GetLayerDefn())
+                    output_line_feature.SetGeometry(line_geometry)
+                    output_lines_layer.CreateFeature(output_line_feature)
 
-            # Create output feature
-            #output_line_feature = ogr.Feature(output_lines_layer.GetLayerDefn())
-            #output_line_feature.SetGeometry(line_geometry)
-            #output_lines_layer.CreateFeature(output_line_feature)
-            
-
-            # Create more lines between points
-
-            # Calculate the total distance between the points
-            #total_distance = np.hypot(x2 - x1, y2 - y1)
-            
-            # Define the desired spacing between interpolated points
-            #spacing = 10.0  # adjust as needed
-
-            # Generate points along the line between point1 and point2
-            #for i in np.arange(0, total_distance, spacing):
-               # x_offset = x1 + (x2 - x1) * (i / total_distance)
-               # y_offset = y1 + (y2 - y1) * (i / total_distance)
-                
-                # Interpolate the z-value at the offset point
-               # z_offset = (1 - i / total_distance) * profile1.interp(i) + (i / total_distance) * profile2.interp(i)
-
-                # Calculate the displacement vector for the original line
-              #  vec = np.array([[x2 - x1,], [y2 - y1,]])
-
-                # Rotate the vector 90 deg clockwise and 90 deg counter clockwise
-               # rot_anti = np.array([[0, -1], [1, 0]])
-               # rot_clock = np.array([[0, 1], [-1, 0]])
-               # vec_anti = np.dot(rot_anti, vec)
-               # vec_clock = np.dot(rot_clock, vec)
-
-                # Normalize the perpendicular vectors
-                #len_anti = ((vec_anti**2).sum())**0.5
-                #vec_anti = vec_anti/len_anti
-                #len_clock = ((vec_clock**2).sum())**0.5
-                #vec_clock = vec_clock/len_clock
-
-                # Determine the length of the lines
-                #length = 10  # adjust as needed
-
-                # Calculate the coordinates of the endpoints of the perpendicular line
-                #x3 = x_offset + vec_anti[0][0] * length / 2
-                #y3 = y_offset + vec_anti[1][0] * length / 2
-                #x4 = x_offset + vec_clock[0][0] * length / 2
-                #y4 = y_offset + vec_clock[1][0] * length / 2
-                
-                # Create a LineString from the endpoints of the perpendicular line
-                #perpendicular_line_geometry = ogr.Geometry(ogr.wkbLineString25D)
-                #perpendicular_line_geometry.AddPoint(x3, y3, float(z_offset))
-                #perpendicular_line_geometry.AddPoint(x4, y4, float(z_offset))
-
-                # Create output feature
-                #output_perpendicular_line_feature = ogr.Feature(output_lines_layer.GetLayerDefn())
-                #output_perpendicular_line_feature.SetGeometry(perpendicular_line_geometry)
-                #output_lines_layer.CreateFeature(output_perpendicular_line_feature)
+            previous_perpendicular_line = perpendicular_points
 
     logging.info(f"processed {len(points)} points and created lines")
 
