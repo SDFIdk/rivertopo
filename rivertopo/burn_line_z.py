@@ -44,10 +44,10 @@ def main():
     int_band_array = int_band.ReadAsArray()
     
     # only store the minimum values
-    int_band_array = np.minimum(int_band_array, band_array)
+    #int_band_array = np.minimum(int_band_array, band_array)
 
     # replace values in the intermediate band array with original band if they are larger
-    #int_band_array = np.where(int_band_array > band_array, band_array, int_band_array)
+    int_band_array = np.where(int_band_array > band_array, band_array, int_band_array)
    
     # Write the updated array back to the band
     int_band.WriteArray(int_band_array)

@@ -20,11 +20,30 @@ def get_profile(point, profile_type):
     elif profile_type == 'opmaalt':
         return OpmaaltProfil(point)
 
-def create_perpendicular_lines(point1_geometry, point2_geometry, length=10):
-    # Get coordinates for each point
-    x1, y1 = point1_geometry.GetX(), point1_geometry.GetY()
-    x2, y2 = point2_geometry.GetX(), point2_geometry.GetY()
+def calculate_center(geometry_ref):
+    geometry_coords = np.array(geometry_ref.GetPoints())
+    z_min_indices = np.argmin(geometry_coords[:,2])
+    z_min_coords = geometry_coords[z_min_indices,:].reshape(-1, 3) 
+    thalweg_coord = np.mean(z_min_coords, axis=0)
 
+    return thalweg_coord
+
+def create_perpendicular_lines(point1_geometry, point2_geometry, length=10):
+
+     # Check the type of point1_geometry and point2_geometry
+    if point1_geometry.GetGeometryName() == 'LINESTRING' and point2_geometry.GetGeometryName() == 'LINESTRING':
+        # If they are LINESTRINGs, get the center point
+        x1, y1 = calculate_center(point1_geometry)[0], calculate_center(point1_geometry)[1]
+        x2, y2 = calculate_center(point2_geometry)[0], calculate_center(point2_geometry)[1]
+    else:
+        # If not, just get the first point as usual
+        x1, y1 = point1_geometry.GetX(), point1_geometry.GetY()
+        x2, y2 = point2_geometry.GetX(), point2_geometry.GetY()
+
+    # Get coordinates for each point
+    #x1, y1 = point1_geometry.GetX(), point1_geometry.GetY()
+    #x2, y2 = point2_geometry.GetX(), point2_geometry.GetY()
+    
     # Calculate the displacement vector for the original line
     vec = np.array([[x2 - x1,], [y2 - y1,]])
 
@@ -53,26 +72,59 @@ def create_perpendicular_lines(point1_geometry, point2_geometry, length=10):
 
     # find the middle
     offset = np.sqrt((x-x3)**2+ (y-y3)**2) - np.sqrt((x1-x3)**2+(y1-y3)**2)
+    #import pdb; pdb.set_trace()
 
     return offset, t, x3, x4, y3, y4
 
-def handle_opmaalt_profil(point1, point2, profile1, profile2):
+#def handle_opmaalt_profil(point1, point2, profile1, profile2, previous_perpendicular_lineOP, output_lines_layer):
 
-    point1_geometry = point1.GetGeometryRef()
-    point2_geometry = point2.GetGeometryRef()
+    #point1_geometryOP = point1.GetGeometryRef()
+    #point2_geometryOP = point2.GetGeometryRef()
+    # Extract X, Y, Z coordinates from both profiles
+    #coords1 = np.array(point1_geometryOP.GetPoints())  
+    #coords2 = np.array(point2_geometryOP.GetPoints())
 
-    x1, y1 = point1_geometry.GetX(), point1_geometry.GetY()
-    x2, y2 = point2_geometry.GetX(), point2_geometry.GetY()
+    #z_1 = profile1.interp(coords1[2])
+    #z_2 = profile2.interp(coords2[2])
 
-    print(x1)
+    #pointsOP = []
+    #for i in range(len(coords1)):
+        #x_op = coords1[i][0]
+        #y_op = coords1[i][1]
+        #z_op = z_1[i]
+        #pointsOP.append((x_op, y_op, z_op))
 
-    interp_point1 = profile1.interp(point1)
-    interp_point2 = profile2.interp(point2)
+    #for i in range(len(coords2)):
+        #x_op = coords2[i][0]
+        #y_op = coords2[i][1]
+        #z_op = z_2[i]
+        #pointsOP.append((x_op, y_op, z_op))
 
-    return interp_point1, interp_point2
+    #if previous_perpendicular_lineOP:
+        #for i in range(len(pointsOP)):
+            #point1 = previous_perpendicular_lineOP[i]
+            #point2 = pointsOP[i]
+            #print(f"point1: {point1}, type: {type(point1)}")
+            #print(f"point2: {point1}, type: {type(point2)}")
+
+            #line_geometryOP = ogr.Geometry(ogr.wkbLineString25D)
+            #line_geometryOP.AddPoint(point1[0], point1[1], float(point1[2]))
+            #line_geometryOP.AddPoint(point2[0], point2[1], float(point2[2]))
+
+            # Create output feature for crosssections
+            #output_line_featureOP = ogr.Feature(output_lines_layer.GetLayerDefn())
+            #output_line_featureOP.SetGeometry(line_geometryOP)
+            #output_lines_layer.CreateFeature(output_line_featureOP)
+        
+    #return pointsOP
 
 
 def create_lines_from_interpolated_points(profile1, profile2, offset, t, x3, x4, y3, y4, previous_perpendicular_line, output_lines_layer):
+    
+    #if isinstance (profile1, OpmaaltProfil):
+        #z1_values = profile1.interp(offset)
+        #z2_values = profile2.interp(offset)
+    #else:
     # Interpolate Z values from points based on the class
     z1_values = profile1.interp(offset)  # returns an array of Z values for profile 1
     z2_values = profile2.interp(offset)  # returns an array of Z values for profile 2
@@ -86,10 +138,15 @@ def create_lines_from_interpolated_points(profile1, profile2, offset, t, x3, x4,
         z_curr = (1-t[i]) * z1_values[i] + t[i] * z2_values[i]
         perpendicular_points.append((x_curr, y_curr, z_curr))
 
+
     if previous_perpendicular_line:  # Only draw lines if there was a previous line
         for j in range(len(t)):  
             point1 = previous_perpendicular_line[j]
             point2 = perpendicular_points[j]
+
+            # Check if z coordinate is NaN
+            if np.isnan(point1[2]) or np.isnan(point2[2]):
+                continue
 
             line_geometry = ogr.Geometry(ogr.wkbLineString25D)
             line_geometry.AddPoint(point1[0], point1[1], float(point1[2]))
@@ -151,26 +208,31 @@ def main():
     )
     output_lines_layer = output_lines_datasrc.GetLayer()
     previous_perpendicular_line= []
-    # Iterate over each group of points and create a line for each pair of points within the group
+    previous_perpendicular_lineOP = []
+    # Iterate over each group of points and create lines for each pair of points within the group
     for point_group in grouped_points.values():
         previous_perpendicular_line = None
         for i in range(len(point_group) - 1):
+
             point1 = point_group[i]
             point2 = point_group[i + 1]
 
             # Determine which interpolation method to be used for the profile type
             profile1 = get_profile(point1, point1.profile_type)
             profile2 = get_profile(point2, point2.profile_type)
-             # Check if it's an OpmaaltProfil and handle separately
-            if isinstance(profile1, OpmaaltProfil):
-                handle_opmaalt_profil(point1, point2, profile1, profile2)
-            else:
-                point1_geometry = point1.GetGeometryRef()
-                point2_geometry = point2.GetGeometryRef()
 
-                offset, t, x3, x4, y3, y4 = create_perpendicular_lines(point1_geometry, point2_geometry)
+            # Check if it's an OpmaaltProfil and handle separately
+            #if isinstance(profile1, OpmaaltProfil):
 
-                previous_perpendicular_line = create_lines_from_interpolated_points(profile1, profile2, offset, t, x3, x4, y3, y4, previous_perpendicular_line, output_lines_layer)
+                #previous_perpendicular_lineOP = handle_opmaalt_profil(point1, point2, profile1, profile2, previous_perpendicular_lineOP, output_lines_layer)
+            
+            #else:
+            point1_geometry = point1.GetGeometryRef()
+            point2_geometry = point2.GetGeometryRef()
+
+            offset, t, x3, x4, y3, y4 = create_perpendicular_lines(point1_geometry, point2_geometry)
+
+            previous_perpendicular_line = create_lines_from_interpolated_points(profile1, profile2, offset, t, x3, x4, y3, y4, previous_perpendicular_line, output_lines_layer)
 
     logging.info(f"processed {len(points)} points and created lines")
 
