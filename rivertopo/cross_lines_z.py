@@ -1,13 +1,9 @@
 from itertools import groupby
 from osgeo import gdal, ogr
 import numpy as np
-from tqdm import tqdm
-import argparse
-import logging
-import random
 
-from profile import RegulativProfilSimpel, RegulativProfilSammensat, OpmaaltProfil  # import interpolation classes
-from snapping import snap_points
+from rivertopo.profile import RegulativProfilSimpel, RegulativProfilSammensat, OpmaaltProfil  # import interpolation classes
+from rivertopo.snapping import snap_points
 
 gdal.UseExceptions()
 ogr.UseExceptions()
