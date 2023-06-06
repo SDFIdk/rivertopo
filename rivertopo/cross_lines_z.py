@@ -40,10 +40,6 @@ def create_perpendicular_lines(point1_geometry, point2_geometry, length=10):
         x1, y1 = point1_geometry.GetX(), point1_geometry.GetY()
         x2, y2 = point2_geometry.GetX(), point2_geometry.GetY()
 
-    # Get coordinates for each point
-    #x1, y1 = point1_geometry.GetX(), point1_geometry.GetY()
-    #x2, y2 = point2_geometry.GetX(), point2_geometry.GetY()
-    
     # Calculate the displacement vector for the original line
     vec = np.array([[x2 - x1,], [y2 - y1,]])
 
@@ -72,59 +68,11 @@ def create_perpendicular_lines(point1_geometry, point2_geometry, length=10):
 
     # find the middle
     offset = np.sqrt((x-x3)**2+ (y-y3)**2) - np.sqrt((x1-x3)**2+(y1-y3)**2)
-    #import pdb; pdb.set_trace()
 
     return offset, t, x3, x4, y3, y4
 
-#def handle_opmaalt_profil(point1, point2, profile1, profile2, previous_perpendicular_lineOP, output_lines_layer):
-
-    #point1_geometryOP = point1.GetGeometryRef()
-    #point2_geometryOP = point2.GetGeometryRef()
-    # Extract X, Y, Z coordinates from both profiles
-    #coords1 = np.array(point1_geometryOP.GetPoints())  
-    #coords2 = np.array(point2_geometryOP.GetPoints())
-
-    #z_1 = profile1.interp(coords1[2])
-    #z_2 = profile2.interp(coords2[2])
-
-    #pointsOP = []
-    #for i in range(len(coords1)):
-        #x_op = coords1[i][0]
-        #y_op = coords1[i][1]
-        #z_op = z_1[i]
-        #pointsOP.append((x_op, y_op, z_op))
-
-    #for i in range(len(coords2)):
-        #x_op = coords2[i][0]
-        #y_op = coords2[i][1]
-        #z_op = z_2[i]
-        #pointsOP.append((x_op, y_op, z_op))
-
-    #if previous_perpendicular_lineOP:
-        #for i in range(len(pointsOP)):
-            #point1 = previous_perpendicular_lineOP[i]
-            #point2 = pointsOP[i]
-            #print(f"point1: {point1}, type: {type(point1)}")
-            #print(f"point2: {point1}, type: {type(point2)}")
-
-            #line_geometryOP = ogr.Geometry(ogr.wkbLineString25D)
-            #line_geometryOP.AddPoint(point1[0], point1[1], float(point1[2]))
-            #line_geometryOP.AddPoint(point2[0], point2[1], float(point2[2]))
-
-            # Create output feature for crosssections
-            #output_line_featureOP = ogr.Feature(output_lines_layer.GetLayerDefn())
-            #output_line_featureOP.SetGeometry(line_geometryOP)
-            #output_lines_layer.CreateFeature(output_line_featureOP)
-        
-    #return pointsOP
-
-
 def create_lines_from_interpolated_points(profile1, profile2, offset, t, x3, x4, y3, y4, previous_perpendicular_line, output_lines_layer):
     
-    #if isinstance (profile1, OpmaaltProfil):
-        #z1_values = profile1.interp(offset)
-        #z2_values = profile2.interp(offset)
-    #else:
     # Interpolate Z values from points based on the class
     z1_values = profile1.interp(offset)  # returns an array of Z values for profile 1
     z2_values = profile2.interp(offset)  # returns an array of Z values for profile 2
@@ -165,23 +113,25 @@ def main():
     argument_parser.add_argument('input_points_simpel', type=str, help='input points vector data source for simpel')
     argument_parser.add_argument('input_points_sammensat', type=str, help='input points vector data source for sammensat')
     argument_parser.add_argument('input_points_opmaalt', type=str, help= 'input points vector data source for opmaalt')
+    #argument_parser.add_argument('input_polyline', type=str, help='input polyline vector data source')
     argument_parser.add_argument('output_lines', type=str, help='output geometry file for lines with Z')
     
-    #argument_parser.add_argument('input_polyline', type=str, help='input polyline vector data source')
-
     input_arguments = argument_parser.parse_args()
 
     input_points_simpel_path = input_arguments.input_points_simpel
     input_points_sammensat_path = input_arguments.input_points_sammensat
     input_points_opmaalt_path = input_arguments.input_points_opmaalt
+    input_polyline_path = input_arguments.input_polyline
     output_lines_path = input_arguments.output_lines
 
-    #input_polyline_path = input_arguments.input_polyline
+    # Load the polyline layer and get the polyline geometry
     #input_polyline_datasrc = ogr.Open(input_polyline_path)
     #input_polyline_layer = input_polyline_datasrc.GetLayer()
-
     #input_polyline_feature = input_polyline_layer.GetNextFeature()
     #stream_linestring = input_polyline_feature.GetGeometryRef()
+
+    # List to store the snapped points
+    #snapped_points = []
 
     # Load all points from all files into memory and sort by "id" attribute
     points = []
@@ -193,8 +143,16 @@ def main():
             point_feature.profile_type = profile_type  # Add the profile type to the point feature
             points.append(point_feature)
 
+
+    # Now snap the points to the polyline
+    #points_np = np.array([point.GetGeometryRef().GetPoint()[:2] for point in points])
+    #snap_results = snap_points(points_np, stream_linestring)
+
+    # Sort points by their respective segment indices and parametric distances along the segments
+    #points = [point for _, point in sorted(zip(snap_results, points), key=lambda item: (item[0].segment, item[0].param))]
+
     points.sort(key=lambda f: (f.GetField("laengdeprofillokalid"), f.GetField("regulativstationering")))
-    #sample_points = points[:10]
+    
     # Now we group the points based on their ID
     grouped_points = {k: sorted(g, key=lambda f: f.GetField("regulativstationering")) for k, g in groupby(points, key=lambda f: f.GetField("laengdeprofillokalid"))}
 
@@ -221,12 +179,6 @@ def main():
             profile1 = get_profile(point1, point1.profile_type)
             profile2 = get_profile(point2, point2.profile_type)
 
-            # Check if it's an OpmaaltProfil and handle separately
-            #if isinstance(profile1, OpmaaltProfil):
-
-                #previous_perpendicular_lineOP = handle_opmaalt_profil(point1, point2, profile1, profile2, previous_perpendicular_lineOP, output_lines_layer)
-            
-            #else:
             point1_geometry = point1.GetGeometryRef()
             point2_geometry = point2.GetGeometryRef()
 
