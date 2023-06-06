@@ -1,4 +1,4 @@
-from hydroadjust.burning import burn_lines
+from rivertopo.burning import burn_lines
 
 from osgeo import gdal, ogr
 import argparse
