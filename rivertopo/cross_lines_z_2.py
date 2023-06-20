@@ -40,58 +40,42 @@ def create_perpendicular_lines_on_polylines(stream_linestring, length=10, interv
         
         perpendicular_lines.append((offset, t, x3, x4, y3, y4))
 
-    return offset, t, x3, x4, y3, y4
+    return perpendicular_lines, offset, t, x3, x4, y3, y4
 
-# def give_profile_to_segments(point_with_profile, segments, points_with_profiles):
+def give_profile_to_segments(segment_linestring, points_with_profiles):
 
-#     point, profile_type = point_with_profile
+    #find the closest point to the segment.
+    min_distance = float('inf')
+    snapped_result = None
+    closest_point = None
+    profile_type_line = None
+    for point_with_profile in points_with_profiles:
+        point_feature, profile_type = point_with_profile
+        point = point_feature.GetGeometryRef().Clone()
 
-#     # First, find the closest segment to the point.
-#     min_distance = float('inf')
-#     snapped_result = None
-#     closest_segment = None
-#     for segment in segments:
-#         # Construct a LineString from the segment
-#         segment_linestring = ogr.Geometry(ogr.wkbLineString)
-#         segment_linestring.AddPoint(*segment[0])
-#         segment_linestring.AddPoint(*segment[1])
-
-#         # Perform the snapping operation
-#         point_np = np.array([point.GetPoint()[:2]])
-#         snap_result = snap_points(point_np, segment_linestring)[0] 
+        #snapping operation
+        point_np = np.array([point.GetPoint()[:2]])
+        snap_result = snap_points(point_np, segment_linestring)[0] 
         
-#         # Assuming offset gives us the distance
-#         if abs(snap_result.offset) < min_distance:
-#             min_distance = abs(snap_result.offset)
-#             closest_segment = segment_linestring
-#             snapped_result = snap_result
+        # assuming offset gives us the distance ?
+        if abs(snap_result.offset) < min_distance:
+            min_distance = abs(snap_result.offset)
+            closest_point = point_feature
+            profile_type_line = profile_type
 
-#     # Finally, determine the profile type of the line.
-#     profile_type = None
-#     for profile_point, profile in points_with_profiles:
-#         if np.array_equal(profile_point.GetPoint()[:2], point.GetPoint()[:2]):
-#             profile_type = profile
-#             break
-    
-#     snapped_point = ogr.Geometry(ogr.wkbPoint)
-#     snapped_point.AddPoint_2D(*closest_segment.GetPoint(int(snapped_result.param)))  # Here we're assuming 'param' gives us the point index on the segment
-    
-#     return snapped_point, closest_segment, profile_type
+    return closest_point, profile_type_line
 
-def create_lines_from_perp_lines(offset, t, x3, x4, y3, y4, previous_perpendicular_line, output_lines_layer):
-    #TODO interpolate the lines based on the snapping function and using spatialjoin
-
+def create_lines_from_perp_lines(line_profiles, offset, t, x3, x4, y3, y4, previous_perpendicular_line, output_lines_layer):
     # Interpolate Z values from points based on the class
-    #z1_values = profile1.interp(offset)  # returns an array of Z values for profile 1
-    #z2_values = profile2.interp(offset)  # returns an array of Z values for profile 2
-
+    z1_values = line_profiles.interp(offset)  # returns an array of Z values for profile 
+ 
     # Create a perpendicular normalized line from the interpolated points
     perpendicular_points = []
     for i in range(len(t)):
         # Calculate coordinates and interpolated z-values for each point
         x_curr = t[i] * (x4-x3) + x3
         y_curr = t[i] * (y4-y3) + y3
-        z_curr = 0
+        z_curr = z1_values[i]
         perpendicular_points.append((x_curr, y_curr, z_curr))
 
 
@@ -131,7 +115,7 @@ def main():
     input_polyline_path = input_arguments.input_polyline
     output_lines_path = input_arguments.output_lines
 
-    # Load the polyline layer and get the polyline geometry
+    #load the polyline layer and get the polyline geometry
     input_polyline_datasrc = ogr.Open(input_polyline_path)
     input_polyline_layer = input_polyline_datasrc.GetLayer()
     input_polyline_feature = input_polyline_layer.GetNextFeature()
@@ -153,10 +137,9 @@ def main():
 
         for point_feature in input_points_layer:
             point_feature.profile_type = profile_type
-            point = point_feature.GetGeometryRef().Clone()
-            points.append((point, profile_type))
+            points.append((point_feature, profile_type))
     
-    # Create the output file
+    #create the output file
     output_lines_driver = ogr.GetDriverByName("gpkg")
     output_lines_datasrc = output_lines_driver.CreateDataSource(output_lines_path)
     output_lines_datasrc.CreateLayer(
@@ -166,30 +149,31 @@ def main():
     )
     output_lines_layer = output_lines_datasrc.GetLayer()
 
-    # Create lists to store perpendicular lines in
+    #create lists to store perpendicular lines in
     previous_perpendicular_line = None
 
-    # for point_with_profile in points:
-    #     snapped_point, closest_segment, profile_type = give_profile_to_segments(point_with_profile, segments, points)
-
-    # This is the corrected loop
+    # Loop over all segments
     for segment in segments:
-        # Construct a LineString from the segment
+        #convert segment to LineString
         segment_linestring = ogr.Geometry(ogr.wkbLineString)
         segment_linestring.AddPoint(*segment[0])
         segment_linestring.AddPoint(*segment[1])
 
-        offset, t, x3, x4, y3, y4 = create_perpendicular_lines_on_polylines(segment_linestring, length=10, interval=1)
+        #find the closest point and its profile for each segment
+        closest_point, profile_type_line = give_profile_to_segments(segment_linestring, points)
+
+        perpendicular_lines, offset, t, x3, x4, y3, y4 = create_perpendicular_lines_on_polylines(segment_linestring, length=10, interval=1)
         
-        previous_perpendicular_line = create_lines_from_perp_lines(offset, t, x3, x4, y3, y4, previous_perpendicular_line, output_lines_layer)
+        #associate each perpendicular line with a profile
+        line_profiles = []
+        for perp_line in perpendicular_lines:
+            line_profiles.append((perp_line, get_profile(closest_point, profile_type_line)))
+        
+        profiles = get_profile(closest_point, profile_type_line)
 
-        # Associate each perpendicular line with a profile
-        # perp_lines_with_profiles = []
-        # for perp_line in perp_lines:
-        #     closest_point, closest_point_profile = find_closest_point(perp_line, points)  
-        #     perp_lines_with_profiles.append((perp_line, get_profile(closest_point, closest_point_profile)))
-
+        previous_perpendicular_line = create_lines_from_perp_lines(profiles, offset, t, x3, x4, y3, y4, previous_perpendicular_line, output_lines_layer)
     
+        
     logging.info(f"processed {len(points)} points and created lines")
 
     output_lines_datasrc = None
