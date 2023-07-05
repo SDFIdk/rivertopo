@@ -6,7 +6,6 @@ import logging
 
 from profile import RegulativProfilSimpel, RegulativProfilSammensat, OpmaaltProfil # import interpolation classes
 from snapping import snap_points
-from cross_lines_z import create_perpendicular_lines
 
 gdal.UseExceptions()
 ogr.UseExceptions()
@@ -18,6 +17,49 @@ def get_profile(point, profile_type):
         return RegulativProfilSammensat(point)
     elif profile_type == 'OpmaaltProfil':
         return OpmaaltProfil(point)
+
+def create_perpendicular_lines(point1_geometry, point2_geometry, length=10):
+    
+     # Check the type of point1_geometry and point2_geometry
+    if point1_geometry.GetGeometryName() == 'LINESTRING' and point2_geometry.GetGeometryName() == 'LINESTRING':
+        # If they are LINESTRINGs, get the center point
+        x1, y1 = calculate_center(point1_geometry)[0], calculate_center(point1_geometry)[1]
+        x2, y2 = calculate_center(point2_geometry)[0], calculate_center(point2_geometry)[1]
+    else:
+        # If not, just get the first point as usual
+        x1, y1 = point1_geometry.GetX(), point1_geometry.GetY()
+        x2, y2 = point2_geometry.GetX(), point2_geometry.GetY()
+
+    # Calculate the displacement vector for the original line
+    vec = np.array([[x2 - x1,], [y2 - y1,]])
+
+    # Rotate the vector 90 deg clockwise and 90 deg counter clockwise
+    rot_anti = np.array([[0, -1], [1, 0]])
+    rot_clock = np.array([[0, 1], [-1, 0]])
+    vec_anti = np.dot(rot_anti, vec)
+    vec_clock = np.dot(rot_clock, vec)
+
+    # Normalize the perpendicular vectors
+    len_anti = ((vec_anti**2).sum())**0.5
+    vec_anti = vec_anti/len_anti
+    len_clock = ((vec_clock**2).sum())**0.5
+    vec_clock = vec_clock/len_clock
+
+    # Calculate the coordinates of the endpoints of the perpendicular line
+    x3 = x1 + vec_anti[0][0] * length / 2
+    y3 = y1 + vec_anti[1][0] * length / 2
+    x4 = x1 + vec_clock[0][0] * length / 2
+    y4 = y1 + vec_clock[1][0] * length / 2
+
+    # create multiple x,y values for the perpendicular line
+    t = np.linspace(0,1)
+    x = t* (x4-x3)+x3
+    y = t* (y4-y3)+y3
+
+    # find the middle
+    offset = np.sqrt((x-x3)**2+ (y-y3)**2) - np.sqrt((x1-x3)**2+(y1-y3)**2)
+
+    return offset, t, x3, x4, y3, y4
 
 def create_perpendicular_lines_on_polylines(stream_linestring, length=10, interval=1):
     # Get the number of points in the stream_linestring
