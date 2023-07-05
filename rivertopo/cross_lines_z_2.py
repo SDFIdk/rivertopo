@@ -18,9 +18,17 @@ def get_profile(point, profile_type):
     elif profile_type == 'OpmaaltProfil':
         return OpmaaltProfil(point)
 
+def calculate_center(geometry_ref):
+    geometry_coords = np.array(geometry_ref.GetPoints())
+    z_min_indices = np.argmin(geometry_coords[:,2])
+    z_min_coords = geometry_coords[z_min_indices,:].reshape(-1, 3) 
+    thalweg_coord = np.mean(z_min_coords, axis=0)
+
+    return thalweg_coord
+    
 def create_perpendicular_lines(point1_geometry, point2_geometry, length=10):
     
-     # Check the type of point1_geometry and point2_geometry
+     # Check the type of the two points
     if point1_geometry.GetGeometryName() == 'LINESTRING' and point2_geometry.GetGeometryName() == 'LINESTRING':
         # If they are LINESTRINGs, get the center point
         x1, y1 = calculate_center(point1_geometry)[0], calculate_center(point1_geometry)[1]
