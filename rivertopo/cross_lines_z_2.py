@@ -103,7 +103,7 @@ def main():
     argument_parser = argparse.ArgumentParser()
     argument_parser.add_argument('input_points_simpel', type=str, help='input points vector data source for simpel')
     argument_parser.add_argument('input_points_sammensat', type=str, help='input points vector data source for sammensat')
-    #argument_parser.add_argument('input_points_opmaalt', type=str, help= 'input points vector data source for opmaalt')
+    argument_parser.add_argument('input_points_opmaalt', type=str, help= 'input points vector data source for opmaalt')
     argument_parser.add_argument('input_polyline', type=str, help='input polyline vector data source')
     argument_parser.add_argument('output_lines', type=str, help='output geometry file for lines with Z')
 
@@ -111,7 +111,7 @@ def main():
 
     input_points_simpel_path = input_arguments.input_points_simpel
     input_points_sammensat_path = input_arguments.input_points_sammensat
-    #input_points_opmaalt_path = input_arguments.input_points_opmaalt
+    input_points_opmaalt_path = input_arguments.input_points_opmaalt
     input_polyline_path = input_arguments.input_polyline
     output_lines_path = input_arguments.output_lines
 
@@ -131,7 +131,7 @@ def main():
             segments.append(segment)
        
     points = []
-    for input_points_path, profile_type in [(input_points_simpel_path, 'RegulativProfilSimpel'), (input_points_sammensat_path, 'RegulativProfilSammensat')]:
+    for input_points_path, profile_type in [(input_points_simpel_path, 'RegulativProfilSimpel'), (input_points_sammensat_path, 'RegulativProfilSammensat'), (input_points_opmaalt_path, 'OpmaaltProfil')]:
         input_points_datasrc = ogr.Open(input_points_path)
         input_points_layer = input_points_datasrc.GetLayer()
 
