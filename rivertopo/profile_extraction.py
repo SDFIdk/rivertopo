@@ -5,7 +5,7 @@ from scipy.interpolate import RegularGridInterpolator
 from scipy import interpolate
 from collections import namedtuple
 import argparse
-import logging
+#import logging
 import csv
 
 from cross_lines_z_2 import create_perpendicular_lines, create_perpendicular_lines_on_polylines
@@ -187,6 +187,11 @@ def main():
     )
     output_lines_layer = output_lines_datasrc.GetLayer()
 
+    
+    # Add a new field for the segment index
+    field_defn = ogr.FieldDefn("Seg_Index", ogr.OFTInteger)
+    output_lines_layer.CreateField(field_defn)
+
     # iterate over line and extract profiles perpendicular to the line with a specified interval 
       # Open CSV file for writing
     with open('all_lines.csv', 'w', newline='') as f:
@@ -202,13 +207,12 @@ def main():
 
             perpendicular_lines, offset, t, x3, x4, y3, y4 = create_perpendicular_lines_on_polylines(segment_linestring, length=10, interval=1)
             
-      
             # Create the LineString for the perpendicular line and add it to the output layer
             for line_index, (offset, t, x3, x4, y3, y4) in enumerate(perpendicular_lines):
                 
                 # Create an array of x and y coordinates along the line
-                x_coords = np.linspace(x3, x4, num=100) # num is number of segments
-                y_coords = np.linspace(y3, y4, num=100)
+                x_coords = np.linspace(x3, x4, num=200) # num is number of segments
+                y_coords = np.linspace(y3, y4, num=200)
 
                 # Create bounding box encompassing the entire line
                 input_line_bbox = BoundingBox(
@@ -233,12 +237,13 @@ def main():
                     line_geometry.AddPoint(x, y, z)
                 
                 feature = ogr.Feature(output_lines_layer.GetLayerDefn())
+                feature.SetField("Seg_Index", segment_index)
                 feature.SetGeometry(line_geometry)
                 output_lines_layer.CreateFeature(feature)
                 feature = None
 
                  # Write the line data to the csv file
-                line_id = f'segment_{segment_index}_line_{line_index}'
+                line_id = f'segment_{segment_index}'
                 writer.writerows((line_id, x, y, z) for x, y, z in zip(x_coords, y_coords, z_values))
 
 
