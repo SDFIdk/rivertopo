@@ -4,8 +4,8 @@ import numpy as np
 import argparse
 import logging
 
-from profile import RegulativProfilSimpel, RegulativProfilSammensat, OpmaaltProfil # import interpolation classes
-from snapping import snap_points
+from rivertopo.profile import RegulativProfilSimpel, RegulativProfilSammensat, OpmaaltProfil # import interpolation classes
+from rivertopo.snapping import snap_points
 
 gdal.UseExceptions()
 ogr.UseExceptions()
