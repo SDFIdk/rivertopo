@@ -152,17 +152,23 @@ def get_raster_interpolator(dataset):
 
 def main():
     argument_parser = argparse.ArgumentParser()
-    argument_parser.add_argument('input_raster', type=str, help= 'input DEM raster dataset to sample')
+    argument_parser.add_argument('input_rasters', nargs='+', type=str, help= 'input DEM raster datasets to sample')
+    #argument_parser.add_argument('input_raster', type=str, help= 'input DEM raster dataset to sample')
     argument_parser.add_argument('input_line', type=str, help= 'input line-object vector data source')
     argument_parser.add_argument('output_lines', type=str, help='output geometry file')
 
     input_arguments = argument_parser.parse_args()
 
-    input_raster_path = input_arguments.input_raster
+    input_raster_path = input_arguments.input_rasters
     input_lines_path = input_arguments.input_line
     output_lines_path = input_arguments.output_lines
 
-    input_raster_dataset = gdal.Open(input_raster_path)
+    vrt_options = gdal.BuildVRTOptions(resampleAlg='bilinear')
+    input_raster_vrt = gdal.BuildVRT("/vsimem/input_raster.vrt", input_raster_path, options=vrt_options)
+    
+    input_raster_dataset = input_raster_vrt 
+
+    #input_raster_dataset = gdal.Open(input_raster_path)
 
     input_lines_datasrc = ogr.Open(input_lines_path)
     input_lines_layer = input_lines_datasrc.GetLayer()
@@ -192,7 +198,7 @@ def main():
     field_defn = ogr.FieldDefn("Seg_Index", ogr.OFTInteger)
     output_lines_layer.CreateField(field_defn)
 
-    # iterate over line and extract profiles perpendicular to the line with a specified interval 
+    # iterate over line and extract profiles perpendicular to the line
       # Open CSV file for writing
     with open('all_lines.csv', 'w', newline='') as f:
         writer = csv.writer(f)
@@ -208,7 +214,7 @@ def main():
             perpendicular_lines, offset, t, x3, x4, y3, y4 = create_perpendicular_lines_on_polylines(segment_linestring, length=10, interval=1)
             
             # Create the LineString for the perpendicular line and add it to the output layer
-            for line_index, (offset, t, x3, x4, y3, y4) in enumerate(perpendicular_lines):
+            for offset, t, x3, x4, y3, y4 in perpendicular_lines:
                 
                 # Create an array of x and y coordinates along the line
                 x_coords = np.linspace(x3, x4, num=200) # num is number of segments
