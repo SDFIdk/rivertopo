@@ -44,21 +44,21 @@ def main():
     subplot_titles = [f"Line ID: {line_id}" for line_id in line_ids]
     fig1 = make_subplots(rows=13, cols=3, subplot_titles=subplot_titles)
 
-    # add a line plot for each Line_ID to the subplot layout
-    for i, line_id in enumerate(line_ids):
-        df_line = profile[profile['Line_ID'] == line_id]
-        df_line2 = profile2[profile2['Line_ID'] == line_id]
-        fig1.add_trace(
-            go.Scatter(x=df_line['X'], y=df_line['Z'], mode='lines', name=str(line_id),line=dict(color='lightblue'), showlegend=False),
-            row=i//3 + 1,  # Determine row index
-            col=i%3 + 1   # Determine column index
-        )
+    # # add a line plot for each Line_ID to the subplot layout
+    # for i, line_id in enumerate(line_ids):
+    #     df_line = profile[profile['Line_ID'] == line_id]
+    #     df_line2 = profile2[profile2['Line_ID'] == line_id]
+    #     fig1.add_trace(
+    #         go.Scatter(x=df_line['X'], y=df_line['Z'], mode='lines', name=str(line_id),line=dict(color='lightblue'), showlegend=False),
+    #         row=i//3 + 1,  # Determine row index
+    #         col=i%3 + 1   # Determine column index
+    #     )
         
-        fig1.add_trace(
-            go.Scatter(x=df_line2['X'], y=df_line2['Z'], mode='lines', name=str(line_id), line=dict(color='grey',dash='dash'), showlegend=False),
-            row=i//3 + 1,  # Determine row index
-            col=i%3 + 1   # Determine column index
-        )
+    #     fig1.add_trace(
+    #         go.Scatter(x=df_line2['X'], y=df_line2['Z'], mode='lines', name=str(line_id), line=dict(color='grey',dash='dash'), showlegend=False),
+    #         row=i//3 + 1,  # Determine row index
+    #         col=i%3 + 1   # Determine column index
+    #     )
     
     # Update x axes visibility
     for i in fig1['layout']:
@@ -153,12 +153,19 @@ def main():
         df_line = profile[profile['Line_ID'] == line_id]
         df_line2 = profile2[profile2['Line_ID'] == line_id]
         fig = go.Figure()
+        # Calculate the difference between current and previous 'X' value for both dataframes
+        df_line['X_diff'] = df_line['X'].diff().fillna(0).cumsum()
+        df_line2['X_diff'] = df_line2['X'].diff().fillna(0).cumsum()
+
         fig.add_trace(
-            go.Scatter(x=df_line['X'], y=df_line['Z'], mode='lines', name=str("Tværsnit efter indbrænding"),line=dict(color='lightblue'))
+            go.Scatter(x=df_line['X_diff'], y=df_line['Z'], mode='lines', name=str("Tværsnit efter indbrænding"),line=dict(color='lightblue'))
         )
         fig.add_trace(
-            go.Scatter(x=df_line2['X'], y=df_line2['Z'], mode='lines', name=str("Tværsnit før indbrænding"), line=dict(color='grey',dash='dash'))
+            go.Scatter(x=df_line2['X_diff'], y=df_line2['Z'], mode='lines', name=str("Tværsnit før indbrænding"), line=dict(color='grey',dash='dash'))
         )
+        # Add titles to the axes
+        fig.update_xaxes(title_text='[m]')
+        
         return fig
     return app
 
