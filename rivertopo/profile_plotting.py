@@ -141,7 +141,7 @@ def main():
 
          html.Div([
             dcc.Graph(id='dynamic-graph', style={'height': '40vh'}),
-            dcc.Graph(id='3dmap', figure=fig3, style={'height': '30vh'}),
+            #dcc.Graph(id='3dmap', figure=fig3, style={'height': '30vh'}),
         ], style={'width': '49%', 'display': 'inline-block', 'vertical-align': 'top'}),
     ])
 
@@ -156,15 +156,18 @@ def main():
         # Calculate the difference between current and previous 'X' value for both dataframes
         df_line['X_diff'] = df_line['X'].diff().fillna(0).cumsum()
         df_line2['X_diff'] = df_line2['X'].diff().fillna(0).cumsum()
+        df_line['Z_diff'] = df_line['Z'].diff().fillna(0).cumsum()
+        df_line2['Z_diff'] = df_line2['Z'].diff().fillna(0).cumsum()
 
         fig.add_trace(
-            go.Scatter(x=df_line['X_diff'], y=df_line['Z'], mode='lines', name=str("Tværsnit efter indbrænding"),line=dict(color='lightblue'))
+            go.Scatter(x=df_line['X_diff'], y=df_line['Z_diff'], mode='lines', name=str("Tværsnit efter indbrænding"),line=dict(color='lightblue'))
         )
         fig.add_trace(
-            go.Scatter(x=df_line2['X_diff'], y=df_line2['Z'], mode='lines', name=str("Tværsnit før indbrænding"), line=dict(color='grey',dash='dash'))
+            go.Scatter(x=df_line2['X_diff'], y=df_line2['Z_diff'], mode='lines', name=str("Tværsnit før indbrænding"), line=dict(color='grey',dash='dash'))
         )
         # Add titles to the axes
         fig.update_xaxes(title_text='[m]')
+        fig.update_yaxes(title_text='[m]')
         
         return fig
     return app
