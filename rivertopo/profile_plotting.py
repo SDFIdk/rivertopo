@@ -93,7 +93,10 @@ def main():
     # Add latitude and longitude columns to the dataframe
     gdf['latitude'] = gdf.geometry.y
     gdf['longitude'] = gdf.geometry.x
-        
+    # Compute mean latitude and longitude
+    mean_latitude = gdf['latitude'].mean()
+    mean_longitude = gdf['longitude'].mean()
+
     # Mapbox access token
     px.set_mapbox_access_token("mapbox_token") # replace with your mapbox token
 
@@ -114,8 +117,8 @@ def main():
         mapbox=dict( 
             bearing=0,
             center=dict(
-                lat=55.2639,  # Center latitude 
-                lon=12.1701   # Center longitude
+                lat= mean_latitude, #55.2639,  # Center latitude 
+                lon= mean_longitude #12.1701   # Center longitude
             ),
             pitch=0,
             zoom=16,
