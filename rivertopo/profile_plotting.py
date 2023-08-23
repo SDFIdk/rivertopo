@@ -1,8 +1,6 @@
 import plotly.express as px
 import pandas as pd
-import numpy as np
 import plotly.graph_objects as go
-from osgeo import gdal, ogr
 import argparse
 from shapely.geometry import Point
 import geopandas as gpd
@@ -48,6 +46,15 @@ def main():
             value='ex_profiles1',
             clearable=False
         ),
+        # dcc.Loading(
+        #     id="loading",
+        #     type="default",  # "default" or "circle" or "cube" or "dot" or "circle"
+        #     children=html.Div([
+        #         dcc.Graph(id='map', style={'height': '90vh'}),
+        #     ]),
+        #     style={'width': '49%', 'display': 'inline-block'}
+        # ),
+
         html.Div([
             dcc.Graph(id='map', style={'height': '90vh'}),
         ], style={'width': '49%', 'display': 'inline-block'}),
@@ -110,7 +117,7 @@ def main():
             customdata=gdf['Line_ID'],
         ))
 
-        fig2.update_layout(title='Kortlægning af tværsnit',
+        fig2.update_layout(title='Kort over tværsnit',
             autosize=True,
             hovermode='closest',
             mapbox=dict( 
