@@ -6,3 +6,8 @@ dependencies:
   - scipy
   - pip
   - pytest
+  - plotly
+  - shapely
+  - geopandas
+  - dash
+  - os
