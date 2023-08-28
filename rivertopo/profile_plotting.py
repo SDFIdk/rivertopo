@@ -37,6 +37,7 @@ def main():
 
     app.layout = html.Div([
         html.H1("Tværsnitsdata henover vandløbsmidte"),
+        dcc.Store(id='selected-lines', data=[]),
         dcc.Dropdown(
             id='csv-dropdown',
             options=[
@@ -55,12 +56,30 @@ def main():
             dcc.Graph(id='dynamic-graph', style={'height': '40vh'}),
         ], style={'width': '49%', 'display': 'inline-block', 'vertical-align': 'top'}),
     ])
-
+    @app.callback(
+        Output('selected-lines', 'data'),
+        Input('map', 'clickData'),
+        Input('selected-lines', 'data')
+    )
+    def update_selected_lines(clickData, selected_lines_data):
+        if not selected_lines_data:
+            selected_lines_data = []
+            
+        line_id = clickData['points'][0]['customdata']
+        if line_id in selected_lines_data:
+            # If line_id is already selected, then deselect it (remove from list)
+            selected_lines_data.remove(line_id)
+        else:
+            # Otherwise, select the line (add to list)
+            selected_lines_data.append(line_id)
+        return selected_lines_data
+    
     @app.callback(
         Output('map', 'figure'),
-        Input('csv-dropdown', 'value')
+        [Input('csv-dropdown', 'value'),
+         Input('selected-lines', 'data')]
     )
-    def update_map_figure(selected_csv):
+    def update_map_figure(selected_csv, selected_lines):
         # select the correct path based on the dropdown
         if selected_csv == 'ex_profiles1':
             profile_path = ex_profiles_path1
@@ -99,12 +118,19 @@ def main():
         # Mapbox access token
         px.set_mapbox_access_token("mapbox_token") #replace with mapbox token 
 
+        # Define default and selected colors
+        default_color = 'blue'
+        selected_color = 'red'
+
+        marker_colors = [selected_color if line_id in selected_lines else default_color for line_id in gdf['Line_ID']]
+
         fig2 = go.Figure(go.Scattermapbox(
             lat=gdf['latitude'],
             lon=gdf['longitude'],
             mode='markers',
             marker=go.scattermapbox.Marker(
-                size=2
+                size=2,
+                color=marker_colors
             ),
             text=gdf['Line_ID'],
             customdata=gdf['Line_ID'],
@@ -126,13 +152,17 @@ def main():
         )
         
         return fig2
-
     @app.callback(
         Output('dynamic-graph', 'figure'),
-        [Input('map', 'hoverData'),
-         Input('csv-dropdown', 'value')]
+        [Input('selected-lines', 'data'),
+        Input('csv-dropdown', 'value')]
     )
-    def update_graph(hoverData, selected_csv):
+    # @app.callback(
+    #     Output('dynamic-graph', 'figure'),
+    #     [Input('map', 'clickData'),
+    #      Input('csv-dropdown', 'value')]
+    # )
+    def update_graph(selected_lines, selected_csv):
         # Load the profile data based on dropdown value
         if selected_csv in ['ex_profiles4_line1', 'ex_profiles4_line2']:
             profile1 = pd.read_csv(ex_profiles_path4_line1)
@@ -147,28 +177,46 @@ def main():
             profile1 = pd.read_csv(ex_profiles_path3)
             profile2 = None
         
-        line_id = hoverData['points'][0]['customdata']
-        df_line1 = profile1[profile1['Line_ID'] == line_id]
-        df_line2 = profile2[profile2['Line_ID'] == line_id] if profile2 is not None else None
+        # line_id = clickData['points'][0]['customdata']
+        # df_line1 = profile1[profile1['Line_ID'] == line_id]
+        # df_line2 = profile2[profile2['Line_ID'] == line_id] if profile2 is not None else None
     
         #df_line = profile[profile['Line_ID'] == line_id]
         fig = go.Figure()
+            # For each selected line (cross-section):
+        for line_id in selected_lines:
+            df_line1 = profile1[profile1['Line_ID'] == line_id]
+            df_line2 = profile2[profile2['Line_ID'] == line_id] if profile2 is not None else None
 
-        # Calculate the difference between current and previous 'X' value for both dataframes
-        df_line1['X_diff'] = df_line1['X'].diff().fillna(0).cumsum()
+            # Calculate the difference between current and previous 'X' value for both dataframes
+            df_line1['X_diff'] = df_line1['X'].diff().fillna(0).cumsum()
+            df_line1['Z_diff'] = df_line1['Z'].diff().fillna(0).cumsum()
 
-        df_line1['Z_diff'] = df_line1['Z'].diff().fillna(0).cumsum()
-    
-        fig.add_trace(
-            go.Scatter(x=df_line1['X_diff'], y=df_line1['Z_diff'], mode='lines', name=str("Tværsnit udfra DHM"),line=dict(color='lightblue'))
-        )
-
-        if df_line2 is not None:
-            df_line2['X_diff'] = df_line2['X'].diff().fillna(0).cumsum()
-            df_line2['Z_diff'] = df_line2['Z'].diff().fillna(0).cumsum()
             fig.add_trace(
-                go.Scatter(x=df_line2['X_diff'], y=df_line2['Z_diff'], mode='lines', name=str("Tværsnit efter indbrænding"), line=dict(color='grey', dash='dash'))
+                go.Scatter(x=df_line1['X_diff'], y=df_line1['Z_diff'], mode='lines', name=f"Tværsnit udfra DHM Line_ID {line_id}", line=dict(color='lightblue'))
             )
+
+            if df_line2 is not None:
+                df_line2['X_diff'] = df_line2['X'].diff().fillna(0).cumsum()
+                df_line2['Z_diff'] = df_line2['Z'].diff().fillna(0).cumsum()
+                fig.add_trace(
+                    go.Scatter(x=df_line2['X_diff'], y=df_line2['Z_diff'], mode='lines', name=f"Tværsnit efter indbrænding Line_ID {line_id}", line=dict(color='grey', dash='dash'))
+                )
+        # # Calculate the difference between current and previous 'X' value for both dataframes
+        # df_line1['X_diff'] = df_line1['X'].diff().fillna(0).cumsum()
+
+        # df_line1['Z_diff'] = df_line1['Z'].diff().fillna(0).cumsum()
+    
+        # fig.add_trace(
+        #     go.Scatter(x=df_line1['X_diff'], y=df_line1['Z_diff'], mode='lines', name=str("Tværsnit udfra DHM"),line=dict(color='lightblue'))
+        # )
+
+        # if df_line2 is not None:
+        #     df_line2['X_diff'] = df_line2['X'].diff().fillna(0).cumsum()
+        #     df_line2['Z_diff'] = df_line2['Z'].diff().fillna(0).cumsum()
+        #     fig.add_trace(
+        #         go.Scatter(x=df_line2['X_diff'], y=df_line2['Z_diff'], mode='lines', name=str("Tværsnit efter indbrænding"), line=dict(color='grey', dash='dash'))
+        #     )
        
         # Add titles to the axes
         fig.update_xaxes(title_text='[m]')
