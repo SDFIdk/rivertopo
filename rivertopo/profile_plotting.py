@@ -65,6 +65,9 @@ def main():
         if not selected_lines_data:
             selected_lines_data = []
             
+        if clickData is None:
+            return selected_lines_data
+            
         line_id = clickData['points'][0]['customdata']
         if line_id in selected_lines_data:
             # If line_id is already selected, then deselect it (remove from list)
@@ -163,6 +166,8 @@ def main():
     #      Input('csv-dropdown', 'value')]
     # )
     def update_graph(selected_lines, selected_csv):
+        if selected_lines is None:
+            return go.Figure()
         # Load the profile data based on dropdown value
         if selected_csv in ['ex_profiles4_line1', 'ex_profiles4_line2']:
             profile1 = pd.read_csv(ex_profiles_path4_line1)
