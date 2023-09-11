@@ -31,8 +31,6 @@ def main():
     ex_profiles_path3 = input_arguments.ex_profiles3
     ex_profiles_path4_line1 = input_arguments.ex_profiles4_line1
     ex_profiles_path4_line2 = input_arguments.ex_profiles4_line2
-
-    #ex_profiles_path1= pd.read_csv("..\tests\data\fiskbæk.csv")
     
     def get_file_label(file_path):
         return os.path.basename(file_path).replace('.csv', '')
