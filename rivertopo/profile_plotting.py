@@ -10,7 +10,6 @@ import dash
 from dash import dcc
 from dash import html
 from dash.dependencies import Input, Output
-import os
 
 def main():
     app = dash.Dash(__name__)
@@ -31,6 +30,8 @@ def main():
     ex_profiles_path3 = input_arguments.ex_profiles3
     ex_profiles_path4_line1 = input_arguments.ex_profiles4_line1
     ex_profiles_path4_line2 = input_arguments.ex_profiles4_line2
+
+    #ex_profiles_path1= pd.read_csv("..\tests\data\fiskbæk.csv")
     
     def get_file_label(file_path):
         return os.path.basename(file_path).replace('.csv', '')
@@ -52,6 +53,7 @@ def main():
         html.Div([
             dcc.Graph(id='map', style={'height': '90vh'}),
         ], style={'width': '49%', 'display': 'inline-block'}),
+            dcc.Loading(),
         html.Div([
             dcc.Graph(id='dynamic-graph', style={'height': '40vh'}),
         ], style={'width': '49%', 'display': 'inline-block', 'vertical-align': 'top'}),
