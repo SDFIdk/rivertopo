@@ -159,24 +159,34 @@ def main():
         #df_line = profile[profile['Line_ID'] == line_id]
 
         fig = go.Figure()
+
+        x_mean = df_line1['X'].mean()
+        x_range = df_line1['X'].max() - df_line1['X'].min()
+        scaling_factor = 40 / x_range
+        df_line1['X_adjusted'] = (df_line1['X'] - x_mean) * scaling_factor
+
         # Calculate the difference between current and previous 'X' value for both dataframes
-        df_line1.loc[:,'X_diff'] = df_line1['X'].diff().fillna(0).cumsum()
+        # df_line1.loc[:,'X_diff'] = df_line1['X'].diff().fillna(0).cumsum()
 
         df_line1.loc[:,'Z_diff'] = df_line1['Z'].diff().fillna(0).cumsum()
     
         fig.add_trace(
-            go.Scatter(x=df_line1['X_diff'], y=df_line1['Z_diff'], mode='lines', name=str("Tværsnit udfra DHM"),line=dict(color='lightblue'))
+            go.Scatter(x=df_line1['X_adjusted'], y=df_line1['Z_diff'], mode='lines', name=str("Tværsnit udfra DHM"),line=dict(color='lightblue'))
         )
 
         if df_line2 is not None:
-            df_line2.loc[:,'X_diff'] = df_line2['X'].diff().fillna(0).cumsum()
+            #df_line2.loc[:,'X_adjusted'] = df_line2['X'].diff().fillna(0).cumsum()
+            x_mean = df_line2['X'].mean()
+            x_range = df_line2['X'].max() - df_line2['X'].min()
+            scaling_factor = 40 / x_range
+            df_line2['X_adjusted'] = (df_line2['X'] - x_mean) * scaling_factor
             df_line2.loc[:,'Z_diff'] = df_line2['Z'].diff().fillna(0).cumsum()
             fig.add_trace(
-                go.Scatter(x=df_line2['X_diff'], y=df_line2['Z_diff'], mode='lines', name=str("Tværsnit efter indbrænding"), line=dict(color='grey', dash='dash'))
+                go.Scatter(x=df_line2['X_adjusted'], y=df_line2['Z_diff'], mode='lines', name=str("Tværsnit efter indbrænding"), line=dict(color='grey', dash='dash'))
             )
        
         # Add titles to the axes
-        fig.update_xaxes(title_text='[m]')
+        fig.update_xaxes(title_text='[m]', tick0=-20, dtick=4)
         fig.update_yaxes(title_text='[m]')
         fig.update_layout(title= 'Tværsnits profil:')
         
