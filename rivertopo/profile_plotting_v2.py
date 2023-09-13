@@ -155,18 +155,14 @@ def main():
         line_id = hoverData['points'][0]['customdata']
         df_line1 = profile1[profile1['Line_ID'] == line_id].copy()
         df_line2 = profile2[profile2['Line_ID'] == line_id].copy() if profile2 is not None else None
-    
-        #df_line = profile[profile['Line_ID'] == line_id]
 
         fig = go.Figure()
 
+        # Calculate the new X values so that the center of the segment is 0
         x_mean = df_line1['X'].mean()
         x_range = df_line1['X'].max() - df_line1['X'].min()
         scaling_factor = 40 / x_range
         df_line1['X_adjusted'] = (df_line1['X'] - x_mean) * scaling_factor
-
-        # Calculate the difference between current and previous 'X' value for both dataframes
-        # df_line1.loc[:,'X_diff'] = df_line1['X'].diff().fillna(0).cumsum()
 
         df_line1.loc[:,'Z_diff'] = df_line1['Z'].diff().fillna(0).cumsum()
     
@@ -175,7 +171,7 @@ def main():
         )
 
         if df_line2 is not None:
-            #df_line2.loc[:,'X_adjusted'] = df_line2['X'].diff().fillna(0).cumsum()
+            # Calculate the new X values so that the center of the segment is 0
             x_mean = df_line2['X'].mean()
             x_range = df_line2['X'].max() - df_line2['X'].min()
             scaling_factor = 40 / x_range
