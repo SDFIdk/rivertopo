@@ -74,7 +74,7 @@ profile_plotting_v2.py ex_profiles1 ex_profiles2 ex_profiles3 ex_profiles4_line1
 | `ex_profiles4_line1` | Path to (indbrændt.csv) CSV file containing cross sectional data from profile_extraction.py |
 | `ex_profiles5_line2` | Path to (indbrændings_eksempel.csv) CSV file containing cross sectional data from profile_extraction.py |
 
-## Example workflow
+## Example workflow (creating and burning cross sectional data points)
 
 As an example, the steps below illustrate preparing the relevant intermediate data and burning it into a raster tile.
 
@@ -83,7 +83,7 @@ As an example, the steps below illustrate preparing the relevant intermediate da
 | test_sammensat.gpkg | Input cross sectional data of type sammensat |
 | test_simpel.gpkg | Input cross sectional data of type simple |
 | test_opmaalt.gpkg | Input cross sectional data of type opmaalt |
-| cropped_vandloebsmidte.gpkg | Input vandloebsmidte polylinr |
+| cropped_vandloebsmidte.gpkg | Input vandloebsmidte polyline |
 | LINES_WITH_Z.gpkg | Intermediate datasource of prepared 3D line objects |
 | ORIGINAL_DTM/1km_NNNN_EEE.tif | Input raster tile for which corresponding output will be produced. |
 | ADJUSTED_DTM/1km_NNNN_EEE.tif | Output raster tile, created from the input raster tile with 3D lines burned in |
@@ -94,10 +94,26 @@ Prepare lines with cross sectional data points:
 cross_lines_z_2.py test_simpel.gpkg test_sammensat.gpkg test_opmaalt.gpkg cropped_vandloebsmidte.gpkg LINES_WITH_Z.gpkg 
 ```
 
+Notice that the script as of right now will only handle cases where the points and segments are in order. It might be necesary to 'clean up' the lines manually in QGIS afterwards, for best burn results.
+
 Create the adjusted DEM tile from the 3d lines and the original DEM tile:
 
 ```
 burn_line_z.py LINES_WITH_Z.gpkg ORIGINAL_DTM/1km_NNNN_EEE.tif ADJUSTED_DTM/1km_NNNN_EEE.tif 
+```
+
+## Example workflow (extracting and plotting profiles from DEM tile)
+
+Prepare and extract profiles to a CSV on polyline:
+
+```
+profile_extraction.py ORIGINAL_DTM/1km_NNNN_EEE.tif cropped_vandloebsmidte.gpkg 
+```
+
+Now the CSV file can be used in the plotting module. It is currently set up to plot the 5 example case files:
+
+```
+profile_plotting_v2.py karup.csv skive.csv fiskbæk.csv indbrændt.csv indbrændt_eksempel.csv
 ```
 
 
