@@ -202,7 +202,7 @@ def main():
       # Open CSV file for writing
     with open('all_lines.csv', 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(["Line_ID", "X", "Y", "Z"])  # write header
+        writer.writerow(["Line_ID", "X", "Y", "Z", "Distance"])  # write header
 
         # Loop over all segments
         for segment_index, segment in enumerate(segments):
@@ -211,14 +211,14 @@ def main():
             segment_linestring.AddPoint(*segment[0])
             segment_linestring.AddPoint(*segment[1])
 
-            perpendicular_lines, offset, t, x3, x4, y3, y4 = create_perpendicular_lines_on_polylines(segment_linestring, length=10, interval=1)
+            perpendicular_lines, offset, t, x3, x4, y3, y4 = create_perpendicular_lines_on_polylines(segment_linestring, length=20, interval=1)
             
             # Create the LineString for the perpendicular line and add it to the output layer
             for offset, t, x3, x4, y3, y4 in perpendicular_lines:
                 
                 # Create an array of x and y coordinates along the line
-                x_coords = np.linspace(x3, x4, num=200) # num is number of segments
-                y_coords = np.linspace(y3, y4, num=200)
+                x_coords = np.linspace(x3, x4, num=50) # num is number of segments
+                y_coords = np.linspace(y3, y4, num=50)
 
                 # Create bounding box encompassing the entire line
                 input_line_bbox = BoundingBox(
@@ -241,7 +241,15 @@ def main():
                 line_geometry = ogr.Geometry(ogr.wkbLineString25D)
                 for x, y, z in zip(x_coords, y_coords, z_values):
                     line_geometry.AddPoint(x, y, z)
-                
+
+                # Calculate the distances for each row
+                distances = [0]  # Initialize with the first distance as 0
+                for i in range(1, len(x_coords)):
+                    dx = x_coords[i] - x_coords[i-1]
+                    dy = y_coords[i] - y_coords[i-1]
+                    distance = np.sqrt(dx**2 + dy**2) + distances[-1]
+                    distances.append(distance)
+
                 feature = ogr.Feature(output_lines_layer.GetLayerDefn())
                 feature.SetField("Seg_Index", segment_index)
                 feature.SetGeometry(line_geometry)
@@ -250,7 +258,7 @@ def main():
 
                  # Write the line data to the csv file
                 line_id = f'segment_{segment_index}'
-                writer.writerows((line_id, x, y, z) for x, y, z in zip(x_coords, y_coords, z_values))
+                writer.writerows((line_id, x, y, z, d) for x, y, z, d in zip(x_coords, y_coords, z_values, distances))
 
 
     
