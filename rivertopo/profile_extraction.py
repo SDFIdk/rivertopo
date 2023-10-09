@@ -7,11 +7,18 @@ from collections import namedtuple
 import argparse
 #import logging
 import csv
+import os
 
 from cross_lines_z_2 import create_perpendicular_lines, create_perpendicular_lines_on_polylines
 
 gdal.UseExceptions()
 ogr.UseExceptions()
+
+"""
+This script is used to extract elevation profiles along perpendicular lines to a given polyline 
+feature in a DEM raster
+
+"""
 
 # Create bounding box
 
@@ -197,71 +204,84 @@ def main():
     # Add a new field for the segment index
     field_defn = ogr.FieldDefn("Seg_Index", ogr.OFTInteger)
     output_lines_layer.CreateField(field_defn)
+   
+    # Prepare data storage
+    all_lines_data = {
+        'line_ids': [],
+        'x_coords': [],
+        'y_coords': [],
+        'z_values': [],
+        'distances': [],
+    }
+    # Loop over all segments
+    for segment_index, segment in enumerate(segments):
+        #convert segment to LineString
+        segment_linestring = ogr.Geometry(ogr.wkbLineString)
+        segment_linestring.AddPoint(*segment[0])
+        segment_linestring.AddPoint(*segment[1])
 
-    # iterate over line and extract profiles perpendicular to the line
-      # Open CSV file for writing
-    with open('all_lines.csv', 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(["Line_ID", "X", "Y", "Z", "Distance"])  # write header
-
-        # Loop over all segments
-        for segment_index, segment in enumerate(segments):
-            #convert segment to LineString
-            segment_linestring = ogr.Geometry(ogr.wkbLineString)
-            segment_linestring.AddPoint(*segment[0])
-            segment_linestring.AddPoint(*segment[1])
-
-            perpendicular_lines, offset, t, x3, x4, y3, y4 = create_perpendicular_lines_on_polylines(segment_linestring, length=20, interval=1)
+        perpendicular_lines, offset, t, x3, x4, y3, y4 = create_perpendicular_lines_on_polylines(segment_linestring, length=30, interval=1)
             
-            # Create the LineString for the perpendicular line and add it to the output layer
-            for offset, t, x3, x4, y3, y4 in perpendicular_lines:
+        # Create the LineString for the perpendicular line and add it to the output layer
+        for offset, t, x3, x4, y3, y4 in perpendicular_lines:
                 
-                # Create an array of x and y coordinates along the line
-                x_coords = np.linspace(x3, x4, num=50) # num is number of segments
-                y_coords = np.linspace(y3, y4, num=50)
+            # Create an array of x and y coordinates along the line
+            x_coords = np.linspace(x3, x4, num=50)
+            y_coords = np.linspace(y3, y4, num=50)
 
-                # Create bounding box encompassing the entire line
-                input_line_bbox = BoundingBox(
-                    x_min=min(x_coords),
-                    x_max=max(x_coords),
-                    y_min=min(y_coords),
-                    y_max=max(y_coords)
-                )
+            # Create bounding box encompassing the entire line
+            input_line_bbox = BoundingBox(
+                x_min=min(x_coords),
+                x_max=max(x_coords),
+                y_min=min(y_coords),
+                y_max=max(y_coords)
+            )
 
-                # Get a raster window just covering this line object
-                window_raster_dataset = get_raster_window(input_raster_dataset, input_line_bbox)
+            # Get a raster window just covering this line object
+            window_raster_dataset = get_raster_window(input_raster_dataset, input_line_bbox)
 
-                # Prepare the interpolator
-                window_raster_interpolator = get_raster_interpolator(window_raster_dataset)
+            # Prepare the interpolator
+            window_raster_interpolator = get_raster_interpolator(window_raster_dataset)
 
-                # Interpolate z values along the line
-                z_values = window_raster_interpolator((x_coords, y_coords))
+            # Interpolate z values along the line
+            z_values = window_raster_interpolator((x_coords, y_coords))
            
-                # Create a new line geometry, including z values
-                line_geometry = ogr.Geometry(ogr.wkbLineString25D)
-                for x, y, z in zip(x_coords, y_coords, z_values):
-                    line_geometry.AddPoint(x, y, z)
+            # Create a new line geometry, including z values
+            line_geometry = ogr.Geometry(ogr.wkbLineString25D)
+            for x, y, z in zip(x_coords, y_coords, z_values):
+                line_geometry.AddPoint(x, y, z)
 
-                # Calculate the distances for each row
-                distances = [0]  # Initialize with the first distance as 0
-                for i in range(1, len(x_coords)):
-                    dx = x_coords[i] - x_coords[i-1]
-                    dy = y_coords[i] - y_coords[i-1]
-                    distance = np.sqrt(dx**2 + dy**2) + distances[-1]
-                    distances.append(distance)
+            # Calculate the distances for each row
+            distances = [0]  # Initialize with the first distance as 0
+            for i in range(1, len(x_coords)):
+                dx = x_coords[i] - x_coords[i-1]
+                dy = y_coords[i] - y_coords[i-1]
+                distance = np.sqrt(dx**2 + dy**2) + distances[-1]
+                distances.append(distance)
 
-                feature = ogr.Feature(output_lines_layer.GetLayerDefn())
-                feature.SetField("Seg_Index", segment_index)
-                feature.SetGeometry(line_geometry)
-                output_lines_layer.CreateFeature(feature)
-                feature = None
+            feature = ogr.Feature(output_lines_layer.GetLayerDefn())
+            feature.SetField("Seg_Index", segment_index)
+            feature.SetGeometry(line_geometry)
+            output_lines_layer.CreateFeature(feature)
+            feature = None
 
-                 # Write the line data to the csv file
-                line_id = f'segment_{segment_index}'
-                writer.writerows((line_id, x, y, z, d) for x, y, z, d in zip(x_coords, y_coords, z_values, distances))
+            # Store the line data
+            line_id = f'segment_{segment_index}'
+            all_lines_data['line_ids'].append([line_id] * len(x_coords))
+            all_lines_data['x_coords'].append(x_coords)
+            all_lines_data['y_coords'].append(y_coords)
+            all_lines_data['z_values'].append(z_values)
+            all_lines_data['distances'].append(distances)
+        
+        concatenated_data = {}
+        for key in all_lines_data:
+            concatenated_data[key] = np.concatenate(all_lines_data[key])
 
+        # Save to .npz
+        output_file_path = r"C:\projekter\rivertopo\tests\data\skive.npz"
 
-    
+        np.savez_compressed(output_file_path, **concatenated_data)
+
     ##### Links til inspi #####
     # https://stackoverflow.com/questions/62283718/how-to-extract-a-profile-of-value-from-a-raster-along-a-given-line
     # https://gis.stackexchange.com/questions/167372/extracting-values-from-raster-under-line-using-gdal
