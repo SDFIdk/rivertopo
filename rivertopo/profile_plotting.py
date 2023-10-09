@@ -20,34 +20,15 @@ This script is used to plot the .npz files found in tests\data
 
 def main():
     app = dash.Dash(__name__)
-    # argument_parser = argparse.ArgumentParser()
-    # #argument parser for the 3 examples without cross section burning
-    # argument_parser.add_argument('ex_profiles1', type= str)
-    # argument_parser.add_argument('ex_profiles2', type= str)
-    # argument_parser.add_argument('ex_profiles3', type= str)
-    # argument_parser.add_argument('ex_profiles4', type= str)
-
-    # #argument parser for the 1 example with cross section burning and without
-    # argument_parser.add_argument('ex_profiles4_line1', type= str)
-    # argument_parser.add_argument('ex_profiles4_line2', type= str)
-
-    # input_arguments = argument_parser.parse_args()
-
-    # ex_profiles_path1 = input_arguments.ex_profiles1
-    # ex_profiles_path2 = input_arguments.ex_profiles2
-    # ex_profiles_path3 = input_arguments.ex_profiles3
-    # ex_profiles_path4 = input_arguments.ex_profiles4
-    # ex_profiles_path4_line1 = input_arguments.ex_profiles4_line1
-    # ex_profiles_path4_line2 = input_arguments.ex_profiles4_line2
-    
-    # def get_file_label(file_path):
-    #     return os.path.basename(file_path).replace('.csv', '')
 
     datafolder = os.path.relpath(r'tests\data')
 
     skive_data = np.load(os.path.join(datafolder,"skive.npz"))
     fiskbaek_data = np.load(os.path.join(datafolder,"fiskbaek.npz"))
     karup_data = np.load(os.path.join(datafolder,"karup.npz"))
+
+    pre_burn_data = np.load(os.path.join(datafolder,"pre_burn_ex.npz"))
+    after_burn_data = np.load(os.path.join(datafolder,"after_burn_ex.npz"))
 
     # Convert the npz data to pandas DataFrame
     skive_df = pd.DataFrame({
@@ -74,6 +55,22 @@ def main():
         'Distance': karup_data['distances']
     })
 
+    pre_burn_df = pd.DataFrame({
+        'Line_ID': pre_burn_data['line_ids'],
+        'X': pre_burn_data['x_coords'],
+        'Y': pre_burn_data['y_coords'],
+        'Z': pre_burn_data['z_values'],
+        'Distance': pre_burn_data['distances']
+    })
+
+    after_burn_df = pd.DataFrame({
+        'Line_ID': after_burn_data['line_ids'],
+        'X': after_burn_data['x_coords'],
+        'Y': after_burn_data['y_coords'],
+        'Z': after_burn_data['z_values'],
+        'Distance': after_burn_data['distances']
+    })
+
     app.layout = html.Div([
         html.H1("Tværsnitsdata henover vandløbsmidte"),
         dcc.Store(id='selected-lines', data=[]),
@@ -83,8 +80,8 @@ def main():
                 {'label': 'Skive', 'value': 'ex_profiles1'},
                 {'label': 'Karup', 'value': 'ex_profiles2'},
                 {'label': 'Fiskbaek', 'value': 'ex_profiles3'},
-                #{'label': get_file_label(ex_profiles_path4), 'value': 'ex_profiles4'},
-                #{'label': get_file_label(ex_profiles_path4_line1), 'value': 'ex_profiles4_line1'},
+                {'label': 'Indbrændings eksempel', 'value': 'ex_profiles4'},
+                
             ],
             value='ex_profiles1',
             clearable=False
@@ -110,10 +107,8 @@ def main():
             profile_path = karup_df
         elif selected_csv == 'ex_profiles3':
             profile_path = fiskbaek_df
-        # elif selected_csv == 'ex_profiles4':
-        #     profile_path = ex_profiles_path4
-        # elif selected_csv == 'ex_profiles4_line1':
-        #     profile_path = ex_profiles_path4_line1
+        elif selected_csv == 'ex_profiles4':
+            profile_path = pre_burn_df
         else:
             raise ValueError(f"Unknown CSV file: {selected_csv}")
        
@@ -180,10 +175,6 @@ def main():
     def update_graph(hoverData, selected_csv):
         if hoverData is None:
             return go.Figure()
-        # Load the profile data based on dropdown value
-        # if selected_csv in ['ex_profiles4_line1', 'ex_profiles4_line2']:
-        #     profile1 = pd.read_csv(ex_profiles_path4_line1)
-        #     profile2 = pd.read_csv(ex_profiles_path4_line2)
         if selected_csv == 'ex_profiles1':
             profile1 = skive_df
             profile2 = None
@@ -193,9 +184,10 @@ def main():
         elif selected_csv == 'ex_profiles3':
             profile1 = fiskbaek_df
             profile2 = None
-        # elif selected_csv == 'ex_profiles4':
-        #     profile1 = pd.read_csv(ex_profiles_path4)
-        #     profile2 = None
+        elif selected_csv == 'ex_profiles4':
+            profile1 = pre_burn_df
+            profile2 = after_burn_df
+      
         
         line_id = hoverData['points'][0]['customdata']
         df_line1 = profile1[profile1['Line_ID'] == line_id].copy()
@@ -217,10 +209,10 @@ def main():
 
         if df_line2 is not None:
             # Calculate the new X values so that the center of the segment is 0
-            x_mean = df_line2['X'].mean()
-            x_range = df_line2['X'].max() - df_line2['X'].min()
+            x_mean = df_line2['Distance'].mean()
+            x_range = df_line2['Distance'].max() - df_line2['Distance'].min()
             scaling_factor = 30 / x_range
-            df_line2['X_adjusted'] = (df_line2['X'] - x_mean) * scaling_factor
+            df_line2['X_adjusted'] = (df_line2['Distance'] - x_mean) * scaling_factor
             df_line2.loc[:,'Z_diff'] = df_line2['Z'].diff().fillna(0).cumsum()
             fig.add_trace(
                 go.Scatter(x=df_line2['X_adjusted'], y=df_line2['Z_diff'], mode='lines', name=str("Tværsnit efter indbrænding"), line=dict(color='grey', dash='dash'))
