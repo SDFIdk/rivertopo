@@ -12,28 +12,67 @@ from dash import html
 from dash.dependencies import Input, Output
 import os
 
+
+"""
+This script is used to plot the .npz files found in tests\data 
+
+"""
+
 def main():
     app = dash.Dash(__name__)
-    argument_parser = argparse.ArgumentParser()
-    #argument parser for the 3 examples without cross section burning
-    argument_parser.add_argument('ex_profiles1', type= str)
-    argument_parser.add_argument('ex_profiles2', type= str)
-    argument_parser.add_argument('ex_profiles3', type= str)
+    # argument_parser = argparse.ArgumentParser()
+    # #argument parser for the 3 examples without cross section burning
+    # argument_parser.add_argument('ex_profiles1', type= str)
+    # argument_parser.add_argument('ex_profiles2', type= str)
+    # argument_parser.add_argument('ex_profiles3', type= str)
+    # argument_parser.add_argument('ex_profiles4', type= str)
 
-    #argument parser for the 1 example with cross section burning and without
-    argument_parser.add_argument('ex_profiles4_line1', type= str)
-    argument_parser.add_argument('ex_profiles4_line2', type= str)
+    # #argument parser for the 1 example with cross section burning and without
+    # argument_parser.add_argument('ex_profiles4_line1', type= str)
+    # argument_parser.add_argument('ex_profiles4_line2', type= str)
 
-    input_arguments = argument_parser.parse_args()
+    # input_arguments = argument_parser.parse_args()
 
-    ex_profiles_path1 = input_arguments.ex_profiles1
-    ex_profiles_path2 = input_arguments.ex_profiles2
-    ex_profiles_path3 = input_arguments.ex_profiles3
-    ex_profiles_path4_line1 = input_arguments.ex_profiles4_line1
-    ex_profiles_path4_line2 = input_arguments.ex_profiles4_line2
+    # ex_profiles_path1 = input_arguments.ex_profiles1
+    # ex_profiles_path2 = input_arguments.ex_profiles2
+    # ex_profiles_path3 = input_arguments.ex_profiles3
+    # ex_profiles_path4 = input_arguments.ex_profiles4
+    # ex_profiles_path4_line1 = input_arguments.ex_profiles4_line1
+    # ex_profiles_path4_line2 = input_arguments.ex_profiles4_line2
     
-    def get_file_label(file_path):
-        return os.path.basename(file_path).replace('.csv', '')
+    # def get_file_label(file_path):
+    #     return os.path.basename(file_path).replace('.csv', '')
+
+    datafolder = os.path.relpath(r'tests\data')
+
+    skive_data = np.load(os.path.join(datafolder,"skive.npz"))
+    fiskbaek_data = np.load(os.path.join(datafolder,"fiskbaek.npz"))
+    karup_data = np.load(os.path.join(datafolder,"karup.npz"))
+
+    # Convert the npz data to pandas DataFrame
+    skive_df = pd.DataFrame({
+        'Line_ID': skive_data['line_ids'],
+        'X': skive_data['x_coords'],
+        'Y': skive_data['y_coords'],
+        'Z': skive_data['z_values'],
+        'Distance': skive_data['distances']
+    })
+
+    fiskbaek_df = pd.DataFrame({
+        'Line_ID': fiskbaek_data['line_ids'],
+        'X': fiskbaek_data['x_coords'],
+        'Y': fiskbaek_data['y_coords'],
+        'Z': fiskbaek_data['z_values'],
+        'Distance': fiskbaek_data['distances']
+    })
+
+    karup_df = pd.DataFrame({
+        'Line_ID': karup_data['line_ids'],
+        'X': karup_data['x_coords'],
+        'Y': karup_data['y_coords'],
+        'Z': karup_data['z_values'],
+        'Distance': karup_data['distances']
+    })
 
     app.layout = html.Div([
         html.H1("Tværsnitsdata henover vandløbsmidte"),
@@ -41,10 +80,11 @@ def main():
         dcc.Dropdown(
             id='csv-dropdown',
             options=[
-                {'label': get_file_label(ex_profiles_path1), 'value': 'ex_profiles1'},
-                {'label': get_file_label(ex_profiles_path2), 'value': 'ex_profiles2'},
-                {'label': get_file_label(ex_profiles_path3), 'value': 'ex_profiles3'},
-                {'label': get_file_label(ex_profiles_path4_line1), 'value': 'ex_profiles4_line1'},
+                {'label': 'Skive', 'value': 'ex_profiles1'},
+                {'label': 'Karup', 'value': 'ex_profiles2'},
+                {'label': 'Fiskbaek', 'value': 'ex_profiles3'},
+                #{'label': get_file_label(ex_profiles_path4), 'value': 'ex_profiles4'},
+                #{'label': get_file_label(ex_profiles_path4_line1), 'value': 'ex_profiles4_line1'},
             ],
             value='ex_profiles1',
             clearable=False
@@ -53,7 +93,7 @@ def main():
             dcc.Graph(id='map', style={'height': '90vh'}),
         ], style={'width': '49%', 'display': 'inline-block'}),
         html.Div([
-            dcc.Graph(id='dynamic-graph', style={'height': '40vh'}),
+            dcc.Graph(id='dynamic-graph', style={'height': '60vh'}),
         ], style={'width': '49%', 'display': 'inline-block', 'vertical-align': 'top'}),
     ])
 
@@ -65,18 +105,20 @@ def main():
     def update_map_figure(selected_csv):
         # select the correct path based on the dropdown
         if selected_csv == 'ex_profiles1':
-            profile_path = ex_profiles_path1
+            profile_path = skive_df
         elif selected_csv == 'ex_profiles2':
-            profile_path = ex_profiles_path2
+            profile_path = karup_df
         elif selected_csv == 'ex_profiles3':
-            profile_path = ex_profiles_path3
-        elif selected_csv == 'ex_profiles4_line1':
-            profile_path = ex_profiles_path4_line1
+            profile_path = fiskbaek_df
+        # elif selected_csv == 'ex_profiles4':
+        #     profile_path = ex_profiles_path4
+        # elif selected_csv == 'ex_profiles4_line1':
+        #     profile_path = ex_profiles_path4_line1
         else:
             raise ValueError(f"Unknown CSV file: {selected_csv}")
        
         # Load the profile data csv
-        profile = pd.read_csv(profile_path)
+        profile = profile_path
                   
         # Get unique Line_IDs
         line_ids = profile['Line_ID'].unique()
@@ -139,18 +181,21 @@ def main():
         if hoverData is None:
             return go.Figure()
         # Load the profile data based on dropdown value
-        if selected_csv in ['ex_profiles4_line1', 'ex_profiles4_line2']:
-            profile1 = pd.read_csv(ex_profiles_path4_line1)
-            profile2 = pd.read_csv(ex_profiles_path4_line2)
-        elif selected_csv == 'ex_profiles1':
-            profile1 = pd.read_csv(ex_profiles_path1)
+        # if selected_csv in ['ex_profiles4_line1', 'ex_profiles4_line2']:
+        #     profile1 = pd.read_csv(ex_profiles_path4_line1)
+        #     profile2 = pd.read_csv(ex_profiles_path4_line2)
+        if selected_csv == 'ex_profiles1':
+            profile1 = skive_df
             profile2 = None
         elif selected_csv == 'ex_profiles2':
-            profile1 = pd.read_csv(ex_profiles_path2)
+            profile1 = karup_df
             profile2 = None
         elif selected_csv == 'ex_profiles3':
-            profile1 = pd.read_csv(ex_profiles_path3)
+            profile1 = fiskbaek_df
             profile2 = None
+        # elif selected_csv == 'ex_profiles4':
+        #     profile1 = pd.read_csv(ex_profiles_path4)
+        #     profile2 = None
         
         line_id = hoverData['points'][0]['customdata']
         df_line1 = profile1[profile1['Line_ID'] == line_id].copy()
@@ -159,10 +204,10 @@ def main():
         fig = go.Figure()
 
         # Calculate the new X values so that the center of the segment is 0
-        x_mean = df_line1['X'].mean()
-        x_range = df_line1['X'].max() - df_line1['X'].min()
-        scaling_factor = 40 / x_range
-        df_line1['X_adjusted'] = (df_line1['X'] - x_mean) * scaling_factor
+        x_mean = df_line1['Distance'].mean()
+        x_range = df_line1['Distance'].max() - df_line1['Distance'].min()
+        scaling_factor = 30 / x_range
+        df_line1['X_adjusted'] = (df_line1['Distance'] - x_mean) * scaling_factor
 
         df_line1.loc[:,'Z_diff'] = df_line1['Z'].diff().fillna(0).cumsum()
     
@@ -174,7 +219,7 @@ def main():
             # Calculate the new X values so that the center of the segment is 0
             x_mean = df_line2['X'].mean()
             x_range = df_line2['X'].max() - df_line2['X'].min()
-            scaling_factor = 40 / x_range
+            scaling_factor = 30 / x_range
             df_line2['X_adjusted'] = (df_line2['X'] - x_mean) * scaling_factor
             df_line2.loc[:,'Z_diff'] = df_line2['Z'].diff().fillna(0).cumsum()
             fig.add_trace(
@@ -182,7 +227,7 @@ def main():
             )
        
         # Add titles to the axes
-        fig.update_xaxes(title_text='[m]', tick0=-20, dtick=4)
+        fig.update_xaxes(title_text='[m]', tick0=-15, dtick=4)
         fig.update_yaxes(title_text='[m]')
         fig.update_layout(title= 'Tværsnits profil:')
         
