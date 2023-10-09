@@ -29,7 +29,7 @@ def calculate_center(geometry_ref):
 
     return thalweg_coord
     
-def create_perpendicular_lines(point1_geometry, point2_geometry, length=10):
+def create_perpendicular_lines(point1_geometry, point2_geometry, length=30):
     
      # Check the type of the two points
     if point1_geometry.GetGeometryName() == 'LINESTRING' and point2_geometry.GetGeometryName() == 'LINESTRING':
@@ -72,7 +72,7 @@ def create_perpendicular_lines(point1_geometry, point2_geometry, length=10):
 
     return offset, t, x3, x4, y3, y4
 
-def create_perpendicular_lines_on_polylines(stream_linestring, length=10, interval=1):
+def create_perpendicular_lines_on_polylines(stream_linestring, length=30, interval=1):
     # Get the number of points in the stream_linestring
     num_points = stream_linestring.GetPointCount()
 
@@ -89,7 +89,7 @@ def create_perpendicular_lines_on_polylines(stream_linestring, length=10, interv
         point1_geometry.AddPoint(*point1_coords)
         point2_geometry.AddPoint(*point2_coords)
         # Calculate perpendicular line between the two points
-        offset, t, x3, x4, y3, y4 = create_perpendicular_lines(point1_geometry, point2_geometry, length=10)
+        offset, t, x3, x4, y3, y4 = create_perpendicular_lines(point1_geometry, point2_geometry, length=30)
         
         perpendicular_lines.append((offset, t, x3, x4, y3, y4))
 
@@ -260,7 +260,7 @@ def main():
             #find the closest point and its profile for each segment
             closest_point, profile_type_line = give_profile_to_segments(segment_linestring, points)
 
-            perpendicular_lines, offset, t, x3, x4, y3, y4 = create_perpendicular_lines_on_polylines(segment_linestring, length=10, interval=1)
+            perpendicular_lines, offset, t, x3, x4, y3, y4 = create_perpendicular_lines_on_polylines(segment_linestring, length=30, interval=1)
                 
             #associate each perpendicular line with a profile
             line_profiles = []
