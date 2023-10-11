@@ -12,28 +12,64 @@ from dash import html
 from dash.dependencies import Input, Output
 import os
 
+
+"""
+This script is used to plot the .npz files found in tests\data 
+
+"""
+
 def main():
     app = dash.Dash(__name__)
-    argument_parser = argparse.ArgumentParser()
-    #argument parser for the 3 examples without cross section burning
-    argument_parser.add_argument('ex_profiles1', type= str)
-    argument_parser.add_argument('ex_profiles2', type= str)
-    argument_parser.add_argument('ex_profiles3', type= str)
 
-    #argument parser for the 1 example with cross section burning and without
-    argument_parser.add_argument('ex_profiles4_line1', type= str)
-    argument_parser.add_argument('ex_profiles4_line2', type= str)
+    datafolder = os.path.relpath(r'tests\data')
 
-    input_arguments = argument_parser.parse_args()
+    skive_data = np.load(os.path.join(datafolder,"skive.npz"))
+    fiskbaek_data = np.load(os.path.join(datafolder,"fiskbaek.npz"))
+    karup_data = np.load(os.path.join(datafolder,"karup.npz"))
 
-    ex_profiles_path1 = input_arguments.ex_profiles1
-    ex_profiles_path2 = input_arguments.ex_profiles2
-    ex_profiles_path3 = input_arguments.ex_profiles3
-    ex_profiles_path4_line1 = input_arguments.ex_profiles4_line1
-    ex_profiles_path4_line2 = input_arguments.ex_profiles4_line2
-    
-    def get_file_label(file_path):
-        return os.path.basename(file_path).replace('.csv', '')
+    pre_burn_data = np.load(os.path.join(datafolder,"pre_burn_ex.npz"))
+    after_burn_data = np.load(os.path.join(datafolder,"after_burn_ex.npz"))
+
+    # Convert the npz data to pandas DataFrame
+    skive_df = pd.DataFrame({
+        'Line_ID': skive_data['line_ids'],
+        'X': skive_data['x_coords'],
+        'Y': skive_data['y_coords'],
+        'Z': skive_data['z_values'],
+        'Distance': skive_data['distances']
+    })
+
+    fiskbaek_df = pd.DataFrame({
+        'Line_ID': fiskbaek_data['line_ids'],
+        'X': fiskbaek_data['x_coords'],
+        'Y': fiskbaek_data['y_coords'],
+        'Z': fiskbaek_data['z_values'],
+        'Distance': fiskbaek_data['distances']
+    })
+
+    karup_df = pd.DataFrame({
+        'Line_ID': karup_data['line_ids'],
+        'X': karup_data['x_coords'],
+        'Y': karup_data['y_coords'],
+        'Z': karup_data['z_values'],
+        'Distance': karup_data['distances']
+    })
+
+    pre_burn_df = pd.DataFrame({
+        'Line_ID': pre_burn_data['line_ids'],
+        'X': pre_burn_data['x_coords'],
+        'Y': pre_burn_data['y_coords'],
+        'Z': pre_burn_data['z_values'],
+        'Distance': pre_burn_data['distances']
+    })
+
+    after_burn_df = pd.DataFrame({
+        'Line_ID': after_burn_data['line_ids'],
+        'X': after_burn_data['x_coords'],
+        'Y': after_burn_data['y_coords'],
+        'Z': after_burn_data['z_values'],
+        'Distance': after_burn_data['distances']
+    })
 
     app.layout = html.Div([
         html.H1("Tværsnitsdata henover vandløbsmidte"),
@@ -41,10 +77,11 @@ def main():
         dcc.Dropdown(
             id='csv-dropdown',
             options=[
-                {'label': get_file_label(ex_profiles_path1), 'value': 'ex_profiles1'},
-                {'label': get_file_label(ex_profiles_path2), 'value': 'ex_profiles2'},
-                {'label': get_file_label(ex_profiles_path3), 'value': 'ex_profiles3'},
-                {'label': get_file_label(ex_profiles_path4_line1), 'value': 'ex_profiles4_line1'},
+                {'label': 'Skive', 'value': 'ex_profiles1'},
+                {'label': 'Karup', 'value': 'ex_profiles2'},
+                {'label': 'Fiskbaek', 'value': 'ex_profiles3'},
+                {'label': 'Indbrændings eksempel', 'value': 'ex_profiles4'},
+                
             ],
             value='ex_profiles1',
             clearable=False
@@ -52,52 +89,31 @@ def main():
         html.Div([
             dcc.Graph(id='map', style={'height': '90vh'}),
         ], style={'width': '49%', 'display': 'inline-block'}),
-            dcc.Loading(),
         html.Div([
-            dcc.Graph(id='dynamic-graph', style={'height': '40vh'}),
+            dcc.Graph(id='dynamic-graph', style={'height': '60vh'}),
         ], style={'width': '49%', 'display': 'inline-block', 'vertical-align': 'top'}),
     ])
-    @app.callback(
-        Output('selected-lines', 'data'),
-        Input('map', 'clickData'),
-        Input('selected-lines', 'data')
-    )
-    def update_selected_lines(clickData, selected_lines_data):
-        if not selected_lines_data:
-            selected_lines_data = []
-            
-        if clickData is None:
-            return selected_lines_data
-            
-        line_id = clickData['points'][0]['customdata']
-        if line_id in selected_lines_data:
-            # If line_id is already selected, then deselect it (remove from list)
-            selected_lines_data.remove(line_id)
-        else:
-            # Otherwise, select the line (add to list)
-            selected_lines_data.append(line_id)
-        return selected_lines_data
+
     
     @app.callback(
         Output('map', 'figure'),
-        [Input('csv-dropdown', 'value'),
-         Input('selected-lines', 'data')]
+        Input('csv-dropdown', 'value')
     )
-    def update_map_figure(selected_csv, selected_lines):
+    def update_map_figure(selected_csv):
         # select the correct path based on the dropdown
         if selected_csv == 'ex_profiles1':
-            profile_path = ex_profiles_path1
+            profile_path = skive_df
         elif selected_csv == 'ex_profiles2':
-            profile_path = ex_profiles_path2
+            profile_path = karup_df
         elif selected_csv == 'ex_profiles3':
-            profile_path = ex_profiles_path3
-        elif selected_csv == 'ex_profiles4_line1':
-            profile_path = ex_profiles_path4_line1
+            profile_path = fiskbaek_df
+        elif selected_csv == 'ex_profiles4':
+            profile_path = pre_burn_df
         else:
             raise ValueError(f"Unknown CSV file: {selected_csv}")
        
         # Load the profile data csv
-        profile = pd.read_csv(profile_path)
+        profile = profile_path
                   
         # Get unique Line_IDs
         line_ids = profile['Line_ID'].unique()
@@ -122,19 +138,13 @@ def main():
         # Mapbox access token
         px.set_mapbox_access_token("mapbox_token") #replace with mapbox token 
 
-        # Define default and selected colors
-        default_color = 'blue'
-        selected_color = 'red'
-
-        marker_colors = [selected_color if line_id in selected_lines else default_color for line_id in gdf['Line_ID']]
 
         fig2 = go.Figure(go.Scattermapbox(
             lat=gdf['latitude'],
             lon=gdf['longitude'],
             mode='markers',
             marker=go.scattermapbox.Marker(
-                size=2,
-                color=marker_colors
+                size=2
             ),
             text=gdf['Line_ID'],
             customdata=gdf['Line_ID'],
@@ -156,57 +166,62 @@ def main():
         )
         
         return fig2
+
     @app.callback(
         Output('dynamic-graph', 'figure'),
-        [Input('selected-lines', 'data'),
-        Input('csv-dropdown', 'value')]
+        [Input('map', 'hoverData'),
+         Input('csv-dropdown', 'value')]
     )
-    # @app.callback(
-    #     Output('dynamic-graph', 'figure'),
-    #     [Input('map', 'clickData'),
-    #      Input('csv-dropdown', 'value')]
-    # )
-    def update_graph(selected_lines, selected_csv):
-        if selected_lines is None:
+    def update_graph(hoverData, selected_csv):
+        if hoverData is None:
             return go.Figure()
-        # Load the profile data based on dropdown value
-        if selected_csv in ['ex_profiles4_line1', 'ex_profiles4_line2']:
-            profile1 = pd.read_csv(ex_profiles_path4_line1)
-            profile2 = pd.read_csv(ex_profiles_path4_line2)
-        elif selected_csv == 'ex_profiles1':
-            profile1 = pd.read_csv(ex_profiles_path1)
+        if selected_csv == 'ex_profiles1':
+            profile1 = skive_df
             profile2 = None
         elif selected_csv == 'ex_profiles2':
-            profile1 = pd.read_csv(ex_profiles_path2)
+            profile1 = karup_df
             profile2 = None
         elif selected_csv == 'ex_profiles3':
-            profile1 = pd.read_csv(ex_profiles_path3)
+            profile1 = fiskbaek_df
             profile2 = None
+        elif selected_csv == 'ex_profiles4':
+            profile1 = pre_burn_df
+            profile2 = after_burn_df
+      
         
+        line_id = hoverData['points'][0]['customdata']
+        df_line1 = profile1[profile1['Line_ID'] == line_id].copy()
+        df_line2 = profile2[profile2['Line_ID'] == line_id].copy() if profile2 is not None else None
+
         fig = go.Figure()
-            # For each selected line (cross-section):
-        for line_id in selected_lines:
-            df_line1 = profile1[profile1['Line_ID'] == line_id].copy()
-            df_line2 = profile2[profile2['Line_ID'] == line_id].copy() if profile2 is not None else None
 
-            # Calculate the difference between current and previous 'X' value for both dataframes
-            df_line1.loc[:,'X_diff'] = df_line1['X'].diff().fillna(0).cumsum()
-            df_line1.loc[:,'Z_diff'] = df_line1['Z'].diff().fillna(0).cumsum()
+        # Calculate the new X values so that the center of the segment is 0
+        x_mean = df_line1['Distance'].mean()
+        x_range = df_line1['Distance'].max() - df_line1['Distance'].min()
+        scaling_factor = 30 / x_range
+        df_line1['X_adjusted'] = (df_line1['Distance'] - x_mean) * scaling_factor
 
-            fig.add_trace(
-                go.Scatter(x=df_line1['X_diff'], y=df_line1['Z_diff'], mode='lines', name=f"Tværsnit udfra DHM Line_ID {line_id}", line=dict(color='lightblue'))
-            )
-
-            if df_line2 is not None:
-                df_line2.loc[:,'X_diff'] = df_line2['X'].diff().fillna(0).cumsum()
-                df_line2.loc[:,'Z_diff'] = df_line2['Z'].diff().fillna(0).cumsum()
-                fig.add_trace(
-                    go.Scatter(x=df_line2['X_diff'], y=df_line2['Z_diff'], mode='lines', name=f"Tværsnit efter indbrænding Line_ID {line_id}", line=dict(color='grey', dash='dash'))
-                )
+        df_line1.loc[:,'Z_diff'] = df_line1['Z'].diff().fillna(0).cumsum()
     
+        fig.add_trace(
+            go.Scatter(x=df_line1['X_adjusted'], y=df_line1['Z_diff'], mode='lines', name=str("Tværsnit udfra DHM"),line=dict(color='lightblue'))
+        )
+
+        if df_line2 is not None:
+            # Calculate the new X values so that the center of the segment is 0
+            x_mean = df_line2['Distance'].mean()
+            x_range = df_line2['Distance'].max() - df_line2['Distance'].min()
+            scaling_factor = 30 / x_range
+            df_line2['X_adjusted'] = (df_line2['Distance'] - x_mean) * scaling_factor
+            df_line2.loc[:,'Z_diff'] = df_line2['Z'].diff().fillna(0).cumsum()
+            fig.add_trace(
+                go.Scatter(x=df_line2['X_adjusted'], y=df_line2['Z_diff'], mode='lines', name=str("Tværsnit efter indbrænding"), line=dict(color='grey', dash='dash'))
+            )
+       
         # Add titles to the axes
-        fig.update_xaxes(title_text='[m]')
+        fig.update_xaxes(title_text='[m]', tick0=-15, dtick=4)
         fig.update_yaxes(title_text='[m]')
+        fig.update_layout(title= 'Tværsnits profil:')
         
         return fig
 
