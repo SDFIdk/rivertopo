@@ -1,19 +1,24 @@
 from itertools import groupby
 from osgeo import gdal, ogr
 import numpy as np
+import argparse
+import logging
+from itertools import groupby
+from operator import itemgetter
 
-from rivertopo.profile import RegulativProfilSimpel, RegulativProfilSammensat, OpmaaltProfil  # import interpolation classes
-from rivertopo.snapping import snap_points
+
+from profile import RegulativProfilSimpel, RegulativProfilSammensat, OpmaaltProfil # import interpolation classes
+from snapping import snap_points
 
 gdal.UseExceptions()
 ogr.UseExceptions()
 
 def get_profile(point, profile_type):
-    if profile_type == 'simpel':
+    if profile_type == 'RegulativProfilSimpel':
         return RegulativProfilSimpel(point)
-    elif profile_type == 'sammensat':
+    elif profile_type == 'RegulativProfilSammensat':
         return RegulativProfilSammensat(point)
-    elif profile_type == 'opmaalt':
+    elif profile_type == 'OpmaaltProfil':
         return OpmaaltProfil(point)
 
 def calculate_center(geometry_ref):
@@ -23,10 +28,10 @@ def calculate_center(geometry_ref):
     thalweg_coord = np.mean(z_min_coords, axis=0)
 
     return thalweg_coord
-
-def create_perpendicular_lines(point1_geometry, point2_geometry, length=10):
-
-     # Check the type of point1_geometry and point2_geometry
+    
+def create_perpendicular_lines(point1_geometry, point2_geometry, length=30):
+    
+     # Check the type of the two points
     if point1_geometry.GetGeometryName() == 'LINESTRING' and point2_geometry.GetGeometryName() == 'LINESTRING':
         # If they are LINESTRINGs, get the center point
         x1, y1 = calculate_center(point1_geometry)[0], calculate_center(point1_geometry)[1]
@@ -67,19 +72,63 @@ def create_perpendicular_lines(point1_geometry, point2_geometry, length=10):
 
     return offset, t, x3, x4, y3, y4
 
-def create_lines_from_interpolated_points(profile1, profile2, offset, t, x3, x4, y3, y4, previous_perpendicular_line, output_lines_layer):
-    
-    # Interpolate Z values from points based on the class
-    z1_values = profile1.interp(offset)  # returns an array of Z values for profile 1
-    z2_values = profile2.interp(offset)  # returns an array of Z values for profile 2
+def create_perpendicular_lines_on_polylines(stream_linestring, length=30, interval=1):
+    # Get the number of points in the stream_linestring
+    num_points = stream_linestring.GetPointCount()
 
+    # Initialize list to store perpendicular lines
+    perpendicular_lines = []
+    
+    # Iterate over each pair of consecutive points in the stream_linestring
+    for i in range(num_points - 1):
+        point1_coords = stream_linestring.GetPoint(i)
+        point2_coords = stream_linestring.GetPoint(i + 1)
+        # Create geometry objects from point coordinates
+        point1_geometry = ogr.Geometry(ogr.wkbPoint)
+        point2_geometry = ogr.Geometry(ogr.wkbPoint)
+        point1_geometry.AddPoint(*point1_coords)
+        point2_geometry.AddPoint(*point2_coords)
+        # Calculate perpendicular line between the two points
+        offset, t, x3, x4, y3, y4 = create_perpendicular_lines(point1_geometry, point2_geometry, length=30)
+        
+        perpendicular_lines.append((offset, t, x3, x4, y3, y4))
+
+    return perpendicular_lines, offset, t, x3, x4, y3, y4
+
+def give_profile_to_segments(segment_linestring, points_with_profiles):
+
+    #find the closest point to the segment.
+    min_distance = float('inf')
+    snapped_result = None
+    closest_point = None
+    profile_type_line = None
+    for point_with_profile in points_with_profiles:
+        point_feature, profile_type, laengdeprofillokalid, regulativstationering = point_with_profile
+        point = point_feature.GetGeometryRef().Clone()
+
+        #snapping operation
+        point_np = np.array([point.GetPoint()[:2]])
+        snap_result = snap_points(point_np, segment_linestring)[0] 
+        
+        # assuming offset gives us the distance ?
+        if abs(snap_result.offset) < min_distance:
+            min_distance = abs(snap_result.offset)
+            closest_point = point_feature
+            profile_type_line = profile_type
+
+    return closest_point, profile_type_line
+
+def create_lines_from_perp_lines(line_profiles, offset, t, x3, x4, y3, y4, previous_perpendicular_line, output_lines_layer):
+    # Interpolate Z values from points based on the class
+    z1_values = line_profiles.interp(offset)  # returns an array of Z values for profile 
+ 
     # Create a perpendicular normalized line from the interpolated points
     perpendicular_points = []
     for i in range(len(t)):
         # Calculate coordinates and interpolated z-values for each point
         x_curr = t[i] * (x4-x3) + x3
         y_curr = t[i] * (y4-y3) + y3
-        z_curr = (1-t[i]) * z1_values[i] + t[i] * z2_values[i]
+        z_curr = z1_values[i]
         perpendicular_points.append((x_curr, y_curr, z_curr))
 
 
@@ -89,8 +138,8 @@ def create_lines_from_interpolated_points(profile1, profile2, offset, t, x3, x4,
             point2 = perpendicular_points[j]
 
             # Check if z coordinate is NaN
-            if np.isnan(point1[2]) or np.isnan(point2[2]):
-                continue
+            #if np.isnan(point1[2]) or np.isnan(point2[2]):
+                #continue
 
             line_geometry = ogr.Geometry(ogr.wkbLineString25D)
             line_geometry.AddPoint(point1[0], point1[1], float(point1[2]))
@@ -103,56 +152,48 @@ def create_lines_from_interpolated_points(profile1, profile2, offset, t, x3, x4,
 
     return perpendicular_points
 
-
 def main():
     argument_parser = argparse.ArgumentParser()
     argument_parser.add_argument('input_points_simpel', type=str, help='input points vector data source for simpel')
-    argument_parser.add_argument('input_points_sammensat', type=str, help='input points vector data source for sammensat')
-    argument_parser.add_argument('input_points_opmaalt', type=str, help= 'input points vector data source for opmaalt')
-    #argument_parser.add_argument('input_polyline', type=str, help='input polyline vector data source')
+    #argument_parser.add_argument('input_points_sammensat', type=str, help='input points vector data source for sammensat')
+    #argument_parser.add_argument('input_points_opmaalt', type=str, help= 'input points vector data source for opmaalt')
+    argument_parser.add_argument('input_polyline', type=str, help='input polyline vector data source')
     argument_parser.add_argument('output_lines', type=str, help='output geometry file for lines with Z')
-    
+
     input_arguments = argument_parser.parse_args()
 
     input_points_simpel_path = input_arguments.input_points_simpel
-    input_points_sammensat_path = input_arguments.input_points_sammensat
-    input_points_opmaalt_path = input_arguments.input_points_opmaalt
+    #input_points_sammensat_path = input_arguments.input_points_sammensat
+    #input_points_opmaalt_path = input_arguments.input_points_opmaalt
     input_polyline_path = input_arguments.input_polyline
     output_lines_path = input_arguments.output_lines
 
-    # Load the polyline layer and get the polyline geometry
-    #input_polyline_datasrc = ogr.Open(input_polyline_path)
-    #input_polyline_layer = input_polyline_datasrc.GetLayer()
-    #input_polyline_feature = input_polyline_layer.GetNextFeature()
-    #stream_linestring = input_polyline_feature.GetGeometryRef()
+    #load the polyline layer and get the polyline geometry
+    input_polyline_datasrc = ogr.Open(input_polyline_path)
+    input_polyline_layer = input_polyline_datasrc.GetLayer()
+    input_polyline_feature = input_polyline_layer.GetNextFeature()
 
-    # List to store the snapped points
-    #snapped_points = []
+    segments_dict = {}
+    for input_polyline_feature in input_polyline_layer:
+        stream_linestring = input_polyline_feature.GetGeometryRef()
 
-    # Load all points from all files into memory and sort by "id" attribute
+        linestring_points = np.array(stream_linestring.GetPoints())[:,:2]
+    
+        for i in range(len(linestring_points) - 1):
+            segment = (linestring_points[i], linestring_points[i+1])
+            segments.append(segment)
+       
     points = []
-    for input_points_path, profile_type in [(input_points_simpel_path, 'simpel'), (input_points_sammensat_path, 'sammensat'), (input_points_opmaalt_path, 'opmaalt')]:
+    for input_points_path, profile_type in [(input_points_simpel_path, 'RegulativProfilSimpel')]: #, (input_points_sammensat_path, 'RegulativProfilSammensat'), (input_points_opmaalt_path, 'OpmaaltProfil')]:
         input_points_datasrc = ogr.Open(input_points_path)
         input_points_layer = input_points_datasrc.GetLayer()
 
         for point_feature in input_points_layer:
-            point_feature.profile_type = profile_type  # Add the profile type to the point feature
-            points.append(point_feature)
+            point_feature.profile_type = profile_type
+            points.append((point_feature, profile_type))
 
-
-    # Now snap the points to the polyline
-    #points_np = np.array([point.GetGeometryRef().GetPoint()[:2] for point in points])
-    #snap_results = snap_points(points_np, stream_linestring)
-
-    # Sort points by their respective segment indices and parametric distances along the segments
-    #points = [point for _, point in sorted(zip(snap_results, points), key=lambda item: (item[0].segment, item[0].param))]
-
-    points.sort(key=lambda f: (f.GetField("laengdeprofillokalid"), f.GetField("regulativstationering")))
     
-    # Now we group the points based on their ID
-    grouped_points = {k: sorted(g, key=lambda f: f.GetField("regulativstationering")) for k, g in groupby(points, key=lambda f: f.GetField("laengdeprofillokalid"))}
-
-    # Create the output file
+    #create the output file
     output_lines_driver = ogr.GetDriverByName("gpkg")
     output_lines_datasrc = output_lines_driver.CreateDataSource(output_lines_path)
     output_lines_datasrc.CreateLayer(
@@ -161,28 +202,35 @@ def main():
         geom_type=ogr.wkbLineString25D,
     )
     output_lines_layer = output_lines_datasrc.GetLayer()
-    previous_perpendicular_line= []
-    previous_perpendicular_lineOP = []
-    # Iterate over each group of points and create lines for each pair of points within the group
-    for point_group in grouped_points.values():
-        previous_perpendicular_line = None
-        for i in range(len(point_group) - 1):
 
-            point1 = point_group[i]
-            point2 = point_group[i + 1]
+    #create lists to store perpendicular lines in
+    previous_perpendicular_line = None
 
-            # Determine which interpolation method to be used for the profile type
-            profile1 = get_profile(point1, point1.profile_type)
-            profile2 = get_profile(point2, point2.profile_type)
+    # Loop over all segments
+    for segment in segments:
+        #convert segment to LineString
+        segment_linestring = ogr.Geometry(ogr.wkbLineString)
+        segment_linestring.AddPoint(*segment[0])
+        segment_linestring.AddPoint(*segment[1])
 
-            point1_geometry = point1.GetGeometryRef()
-            point2_geometry = point2.GetGeometryRef()
+        #find the closest point and its profile for each segment
+        closest_point, profile_type_line = give_profile_to_segments(segment_linestring, points)
 
-            offset, t, x3, x4, y3, y4 = create_perpendicular_lines(point1_geometry, point2_geometry)
+        perpendicular_lines, offset, t, x3, x4, y3, y4 = create_perpendicular_lines_on_polylines(segment_linestring, length=30, interval=1)
+                
+        #associate each perpendicular line with a profile
+        line_profiles = []
+        for perp_line in perpendicular_lines:
+            line_profiles.append((perp_line, get_profile(closest_point, profile_type_line)))
+                
+        profiles = get_profile(closest_point, profile_type_line)
 
-            previous_perpendicular_line = create_lines_from_interpolated_points(profile1, profile2, offset, t, x3, x4, y3, y4, previous_perpendicular_line, output_lines_layer)
-
+        previous_perpendicular_line = create_lines_from_perp_lines(profiles, offset, t, x3, x4, y3, y4, previous_perpendicular_line, output_lines_layer)
+            
+        
     logging.info(f"processed {len(points)} points and created lines")
+
+    output_lines_datasrc = None
 
 if __name__ == '__main__':
     main()
