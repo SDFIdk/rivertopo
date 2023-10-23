@@ -9,7 +9,7 @@ import argparse
 import csv
 import os
 
-from cross_lines_z_2 import create_perpendicular_lines, create_perpendicular_lines_on_polylines
+from rivertopo.cross_lines_z import create_perpendicular_lines, create_perpendicular_lines_on_polylines
 
 gdal.UseExceptions()
 ogr.UseExceptions()
