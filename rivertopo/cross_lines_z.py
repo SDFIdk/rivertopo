@@ -2,7 +2,7 @@ from osgeo import gdal, ogr
 import numpy as np
 import argparse
 import logging
-from profile import RegulativProfilSimpel, RegulativProfilSammensat, OpmaaltProfil # import interpolation classes
+from rivertopo.profile import RegulativProfilSimpel, RegulativProfilSammensat, OpmaaltProfil # import interpolation classes
 from snapping import snap_points
 from operator import itemgetter
 from numpy import array_equal
