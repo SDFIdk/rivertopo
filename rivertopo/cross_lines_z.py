@@ -2,10 +2,10 @@ from osgeo import gdal, ogr
 import numpy as np
 import argparse
 import logging
-from rivertopo.profile import RegulativProfilSimpel, RegulativProfilSammensat, OpmaaltProfil # import interpolation classes
-from rivertopo.snapping import snap_points
-from operator import itemgetter
+from profile import RegulativProfilSimpel, RegulativProfilSammensat, OpmaaltProfil # import interpolation classes
+from snapping import snap_points
 from numpy import array_equal
+from collections import defaultdict
 
 """
 This script generates line objects with z-values by interpolating z-values from cross-sectional data. 
@@ -131,7 +131,7 @@ def give_profile_to_segments(segment_linestring, points_with_profiles):
     """
     #find the closest point to the segment.
     min_distance = float('inf')
-    snapped_result = None
+    #snapped_result = None
     closest_point = None
     profile_type_line = None
     for point_with_profile in points_with_profiles:
@@ -141,15 +141,61 @@ def give_profile_to_segments(segment_linestring, points_with_profiles):
         #snapping operation
         point_np = np.array([point.GetPoint()[:2]])
         snap_result = snap_points(point_np, segment_linestring)[0] 
-        
+        #print(snap_result)
         # assuming offset gives us the distance ?
         if abs(snap_result.offset) < min_distance:
             min_distance = abs(snap_result.offset)
             closest_point = point_feature
+            #print(closest_point)
             profile_type_line = profile_type
+            # print(segment_linestring)
+            # segment_start_point = np.array(segment_linestring.GetPoint(snap_result.segment))
+            # segment_end_point = np.array(segment_linestring.GetPoint(snap_result.segment + 1))
+            # segment_vector = segment_end_point - segment_start_point
+
+            # closest_point_on_segment = segment_start_point + snap_result.param * segment_vector
+            # closest_segment_point = ogr.Geometry(ogr.wkbPoint)
+            # closest_segment_point.AddPoint(*closest_point_on_segment)
+            
+
+    #return closest_segment_point, profile_type_line
 
     return closest_point, profile_type_line
     #return start_point, end_point, start_profile_type, end_profile_type
+
+
+########## New functions to handle the data from the new snapping function ###########
+
+def find_closest_perpendicular_line(snapped_point, perp_lines):
+    """
+    Find the perpendicular line closest to the given point created using snapping.
+
+    :param point: The point with profile information.
+    :param perp_lines: List of perpendicular lines with their attributes.
+    :return: Index of the closest perpendicular line.
+    """
+    min_distance = float('inf')
+    closest_index = None
+    for i, (_, _, x3, x4, y3, y4) in enumerate(perp_lines):
+        # Calculate the distance from the point to this perpendicular line
+        # and update min_distance and closest_index accordingly
+        min_distance = 0
+
+    return closest_index
+
+def assign_profiles_to_lines(points_with_profiles, perp_lines):
+    """
+    Assign profiles to perpendicular lines that intersect specific points.
+
+    :param points_with_profiles: Points along the polyline with profile information.
+    :param perp_lines: List of perpendicular lines.
+    :return: Updated list of perpendicular lines with profile information.
+    """
+    for point, profile in points_with_profiles:
+        closest_index = find_closest_perpendicular_line(point, perp_lines)
+        if closest_index is not None:
+            perp_lines[closest_index]['profile'] = profile
+    return perp_lines
 
 def create_lines_from_perp_lines(line_profiles, offset, t, x3, x4, y3, y4, previous_perpendicular_line, output_lines_layer):
     """
@@ -161,12 +207,21 @@ def create_lines_from_perp_lines(line_profiles, offset, t, x3, x4, y3, y4, previ
     :param output_lines_layer: The layer where output lines should be saved.
     :return: The list of generated perpendicular points.
     """
-    
+    #  # Interpolate Z values
+    # if profile:
+    #     # If the line has a profile, use it to interpolate Z values
+    #     z_values = profile.interp(offset)
+    # else:
+    #     # For lines without a profile, interpolate based on the nearest profiles
+    #     # This requires logic to find the nearest profiles and interpolate Z values
+    #     # ...
+
     # Interpolate Z values from points based on the class
     z1_values = line_profiles.interp(offset)  # returns an array of Z values for profile 
     # Create a perpendicular normalized line from the interpolated points
     perpendicular_points = []
     for i in range(len(t)):
+
         # Calculate coordinates and interpolated z-values for each point
         x_curr = t[i] * (x4-x3) + x3
         y_curr = t[i] * (y4-y3) + y3
@@ -213,9 +268,10 @@ def create_lines_from_perp_lines(line_profiles, offset, t, x3, x4, y3, y4, previ
     return perpendicular_points
 
 ################ Sorting function of vandløbsmidte segments
-#sortere efter koordinator
 
-
+def sort_segments(segments):
+    # Sort segments based on starting x-coordinate, then by starting y-coordinate
+    return sorted(segments, key=lambda segment: (segment[0][0], segment[0][1]))
 
 def main():
     """
@@ -252,6 +308,8 @@ def main():
             segment = (linestring_points[i], linestring_points[i+1])
             segments.append(segment)
 
+    segments = sort_segments(segments)
+
     points = []
     for input_points_path, profile_type in [(input_points_simpel_path, 'RegulativProfilSimpel')]: #, (input_points_sammensat_path, 'RegulativProfilSammensat'), (input_points_opmaalt_path, 'OpmaaltProfil')]:
         input_points_datasrc = ogr.Open(input_points_path)
@@ -262,12 +320,20 @@ def main():
             regulativstationering = point_feature.GetField('regulativstationering')
             points.append((point_feature, profile_type, regulativstationering))
     
-    ################ Sorting of reg profiles upstream ???????
+    # Sort points by 'regulativstationering'
+    points_sorted = sorted(points, key=lambda x: x[2])
 
-    points_sorted = sorted(points, key=itemgetter(2))
+    #points_sorted = sorted(points, key=itemgetter(2))
     # print("points",points)
     # print("sorted",points_sorted)
-   
+    
+    # nearest_points_for_segments = {}
+    # for segment in segments:
+    #     upstream, downstream = find_nearest_upstream_downstream(segment, points_sorted)
+    #     nearest_points_for_segments[segment] = (upstream, downstream)
+
+
+
     #create the output file
     output_lines_driver = ogr.GetDriverByName("gpkg")
     output_lines_datasrc = output_lines_driver.CreateDataSource(output_lines_path)
@@ -290,16 +356,17 @@ def main():
 
         #find the closest point and its profile for each segment
         closest_point, profile_type_line = give_profile_to_segments(segment_linestring, points_sorted)
-
+        (print(closest_point))
         perpendicular_lines, offset, t, x3, x4, y3, y4 = create_perpendicular_lines_on_polylines(segment_linestring, length=30, interval=1)
                 
         #associate each perpendicular line with a profile
         line_profiles = []
         for perp_line in perpendicular_lines:
             line_profiles.append((perp_line, get_profile(closest_point, profile_type_line)))
+            
                 
         profiles = get_profile(closest_point, profile_type_line)
-
+        
         previous_perpendicular_line = create_lines_from_perp_lines(profiles, offset, t, x3, x4, y3, y4, previous_perpendicular_line, output_lines_layer)
             
         
