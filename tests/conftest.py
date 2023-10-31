@@ -15,12 +15,21 @@ def driver():
     return ogr.GetDriverByName('Memory')
 
 @pytest.fixture()
-def datasrc(driver):
+def centerline_datasrc(driver):
+    return driver.CreateDataSource('river_centerlines')
+
+@pytest.fixture()
+def profile_datasrc(driver):
     return driver.CreateDataSource('vandloebsdata')
 
 @pytest.fixture()
-def regulativprofilsimpel_layer(datasrc, srs):
-    layer = datasrc.CreateLayer('regulativprofilsimpel_nohist', srs=srs, geom_type=ogr.wkbPoint)
+def centerline_layer(centerline_datasrc, srs):
+    layer = centerline_datasrc.CreateLayer('vandloebsmidte', srs=srs, geom_type=ogr.wkbLineString25D)
+    return layer
+
+@pytest.fixture()
+def regulativprofilsimpel_layer(profile_datasrc, srs):
+    layer = profile_datasrc.CreateLayer('regulativprofilsimpel_nohist', srs=srs, geom_type=ogr.wkbPoint)
     layer.CreateField(ogr.FieldDefn('anlaeghoejre', ogr.OFTReal))
     layer.CreateField(ogr.FieldDefn('anlaegvenstre', ogr.OFTReal))
     layer.CreateField(ogr.FieldDefn('bundbredde', ogr.OFTReal))
@@ -28,8 +37,8 @@ def regulativprofilsimpel_layer(datasrc, srs):
     return layer
 
 @pytest.fixture()
-def regulativprofilsammensat_layer(datasrc, srs):
-    layer = datasrc.CreateLayer('regulativprofilsammens_nohist', srs=srs, geom_type=ogr.wkbPoint)
+def regulativprofilsammensat_layer(profile_datasrc, srs):
+    layer = profile_datasrc.CreateLayer('regulativprofilsammens_nohist', srs=srs, geom_type=ogr.wkbPoint)
     layer.CreateField(ogr.FieldDefn('afsatbanketbreddehoejre', ogr.OFTReal))
     layer.CreateField(ogr.FieldDefn('afsatbanketbreddevenstre', ogr.OFTReal))
     layer.CreateField(ogr.FieldDefn('afsatsanlaeghoejre', ogr.OFTReal))
@@ -42,6 +51,6 @@ def regulativprofilsammensat_layer(datasrc, srs):
     return layer
 
 @pytest.fixture()
-def opmaaltprofil_layer(datasrc, srs):
-    layer = datasrc.CreateLayer('opmaaltprofil_nohist', srs=srs, geom_type=ogr.wkbLineString25D)
+def opmaaltprofil_layer(profile_datasrc, srs):
+    layer = profile_datasrc.CreateLayer('opmaaltprofil_nohist', srs=srs, geom_type=ogr.wkbLineString25D)
     return layer
