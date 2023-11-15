@@ -5,7 +5,8 @@ import logging
 from profile import RegulativProfilSimpel, RegulativProfilSammensat, OpmaaltProfil # import interpolation classes
 from snapping import snap_points
 from numpy import array_equal
-from collections import defaultdict
+from topology import *
+import shapely
 
 """
 This script generates line objects with z-values by interpolating z-values from cross-sectional data. 
@@ -34,49 +35,115 @@ def calculate_center(geometry_ref):
 
     return thalweg_coord
 
-def create_perpendicular_lines(point1_geometry, point2_geometry, length=30):
+def create_snapped_points(stream_linestring, points_with_profiles):
+    """
+    Create new point geometries on stream linestring with profiles.
+    
+    :param segment_linestring: The segment represented as a linestring.
+    :param points_with_profiles: List of points associated with profiles.
+    :return: Snapped point to the linestring
+    """
+
+    snapped_points = []
+    all_snap_results = []
+    for point_with_profile in points_with_profiles:
+        point_feature, profile_type, regulativstationering = point_with_profile
+        point = point_feature.GetGeometryRef().Clone()
+
+        points_np = np.array([point.GetPoint()[:2]])
+
+        # Get the snap results for all points
+        snap_results = snap_points(points_np, stream_linestring)[0]
+        #segment_index = int(snap_results[0].segment)
+        segment_start = np.array(stream_linestring.GetPoint(int(snap_results.segment))[:2])
+        segment_end = np.array(stream_linestring.GetPoint(int(snap_results.segment + 1))[:2])
+        
+        closest_point_np = segment_start + snap_results.param * (segment_end - segment_start)
+        
+        # Create a new point geometry
+        new_point_geom = ogr.Geometry(ogr.wkbPoint)
+        new_point_geom.AddPoint(closest_point_np[0], closest_point_np[1])
+    
+        # Clone the original feature and set new geometry
+        new_point_feature = point_feature.Clone()
+        new_point_feature.SetGeometry(new_point_geom)
+
+        snapped_points.append((new_point_feature, profile_type, regulativstationering))
+
+        all_snap_results.append(snap_results)
+
+    return snapped_points, all_snap_results
+
+
+def create_perpendicular_lines(point1_geometry, point2_geometry, segment_start, segment_end, is_snapped_point=False, length=30):
     """
     Create perpendicular lines between two point geometries at a specified length.
 
-    The perpendicular lines are created to interpolate interating over the middle 
-    of a river segment, so the middle of the cross sections will be based off of these. 
+    If a snapped point is provided, the perpendicular line is created through that point
+    using the direction of the segment it snapped to.
 
-    :param point1_geometry: The first point geometry. 
-    :param point2_geometry: The second point geometry.
+    :param point1_geometry: The first point geometry or the snapped point geometry.
+    :param point2_geometry: The second point geometry or None if is_snapped_point is True.
+    :param is_snapped_point: Boolean to indicate if the first point is a snapped point.
     :param length: The length of the perpendicular line (default is 30 meters).
     :return: Offsets, parameter t, and coordinates of the endpoints of the perpendicular line.
     """
+    # If it is a snapped point, handle differently
+    if is_snapped_point:
+        # Calculate the direction vector of the segment
+        segment_vector = np.array([segment_end[0] - segment_start[0], segment_end[1] - segment_start[1]])
 
-    # Check the type of the two points
-    if point1_geometry.GetGeometryName() == 'LINESTRING' and point2_geometry.GetGeometryName() == 'LINESTRING':
-        # If they are LINESTRINGs, get the center point
-        x1, y1 = calculate_center(point1_geometry)[0], calculate_center(point1_geometry)[1]
-        x2, y2 = calculate_center(point2_geometry)[0], calculate_center(point2_geometry)[1]
+        # Rotate the vector 90 degrees to get the perpendicular direction
+        rot_matrix = np.array([[0, -1], [1, 0]])
+        perp_vector = np.dot(rot_matrix, segment_vector)
+
+        # Normalize the perpendicular vector
+        perp_vector = perp_vector / np.linalg.norm(perp_vector)
+
+        # Get the coordinates of the snapped point
+        x1, y1 = point1_geometry.GetX(), point1_geometry.GetY()
+
+        # Calculate the endpoints of the perpendicular line
+        x3 = x1 + perp_vector[0] * length / 2
+        y3 = y1 + perp_vector[1] * length / 2
+        x4 = x1 - perp_vector[0] * length / 2
+        y4 = y1 - perp_vector[1] * length / 2
+
     else:
-        # If not, just get the first point as usual
+        # If not a snapped point, proceed as before
         x1, y1 = point1_geometry.GetX(), point1_geometry.GetY()
         x2, y2 = point2_geometry.GetX(), point2_geometry.GetY()
 
     # Calculate the displacement vector for the original line
-    vec = np.array([[x2 - x1,], [y2 - y1,]])
+        vec = np.array([[x2 - x1], [y2 - y1]])
 
-    # Rotate the vector 90 deg clockwise and 90 deg counter clockwise
-    rot_anti = np.array([[0, -1], [1, 0]])
-    rot_clock = np.array([[0, 1], [-1, 0]])
-    vec_anti = np.dot(rot_anti, vec)
-    vec_clock = np.dot(rot_clock, vec)
+        # Rotate the vector 90 degrees clockwise and 90 degrees counterclockwise
+        rot_anti = np.array([[0, -1], [1, 0]])
+        rot_clock = np.array([[0, 1], [-1, 0]])
+        vec_anti = np.dot(rot_anti, vec)
+        vec_clock = np.dot(rot_clock, vec)
 
-    # Normalize the perpendicular vectors
-    len_anti = ((vec_anti**2).sum())**0.5
-    vec_anti = vec_anti/len_anti
-    len_clock = ((vec_clock**2).sum())**0.5
-    vec_clock = vec_clock/len_clock
+        # Normalize the perpendicular vectors
+        len_anti = np.linalg.norm(vec_anti)
+        len_clock = np.linalg.norm(vec_clock)
+        vec_anti = vec_anti / len_anti
+        vec_clock = vec_clock / len_clock
 
-    # Calculate the coordinates of the endpoints of the perpendicular line
-    x3 = x1 + vec_anti[0][0] * length / 2
-    y3 = y1 + vec_anti[1][0] * length / 2
-    x4 = x1 + vec_clock[0][0] * length / 2
-    y4 = y1 + vec_clock[1][0] * length / 2
+        # Calculate the coordinates of the endpoints of the perpendicular line
+        x3 = x1 + vec_anti[0][0] * length / 2
+        y3 = y1 + vec_anti[1][0] * length / 2
+        x4 = x1 + vec_clock[0][0] * length / 2
+        y4 = y1 + vec_clock[1][0] * length / 2
+
+        # # Check the type of the two points
+        # if point1_geometry.GetGeometryName() == 'LINESTRING' and point2_geometry.GetGeometryName() == 'LINESTRING':
+        #     # If they are LINESTRINGs, get the center point
+        #     x1, y1 = calculate_center(point1_geometry)[0], calculate_center(point1_geometry)[1]
+        #     x2, y2 = calculate_center(point2_geometry)[0], calculate_center(point2_geometry)[1]
+        # else:
+        #     # If not, just get the first point as usual
+        #     x1, y1 = point1_geometry.GetX(), point1_geometry.GetY()
+        #     x2, y2 = point2_geometry.GetX(), point2_geometry.GetY()
 
     # create multiple x,y values for the perpendicular line
     t = np.linspace(0,1, num=100)
@@ -88,8 +155,21 @@ def create_perpendicular_lines(point1_geometry, point2_geometry, length=30):
 
     return offset, t, x3, x4, y3, y4
 
+def get_segment_points(linestring, segment_index):
+    """
+    Retrieve the start and end points of a segment from a linestring based on the segment index.
+    
+    :param linestring: The linestring geometry.
+    :param segment_index: The index of the segment.
+    :return: The start and end points of the segment.
+    """
+    segment_index = int(segment_index)
+    start_point = linestring.GetPoint(segment_index)
+    end_point = linestring.GetPoint(segment_index + 1)
 
-def create_perpendicular_lines_on_polylines(stream_linestring, length=30, interval=1):
+    return start_point, end_point
+
+def create_perpendicular_lines_on_polylines(stream_linestring, snapped_points, snap_results, length=30, interval=1):
     """
     Create perpendicular lines over a given polyline.
     
@@ -98,13 +178,14 @@ def create_perpendicular_lines_on_polylines(stream_linestring, length=30, interv
     :param interval: The interval between points (default is 1).
     :return: List of perpendicular lines and their attributes.
     """
-
+    
     # Get the number of points in the stream_linestring
     num_points = stream_linestring.GetPointCount()
 
     # Initialize list to store perpendicular lines
     perpendicular_lines = []
-    
+    snap_index = 0
+
     # Iterate over each pair of consecutive points in the stream_linestring
     for i in range(num_points - 1):
         point1_coords = stream_linestring.GetPoint(i)
@@ -114,164 +195,83 @@ def create_perpendicular_lines_on_polylines(stream_linestring, length=30, interv
         point2_geometry = ogr.Geometry(ogr.wkbPoint)
         point1_geometry.AddPoint(*point1_coords)
         point2_geometry.AddPoint(*point2_coords)
-        # Calculate perpendicular line between the two points
-        offset, t, x3, x4, y3, y4 = create_perpendicular_lines(point1_geometry, point2_geometry, length=30)
+
+        if snap_index < len(snap_results) and i == snap_results[snap_index].segment:
+            # Get the segment's start and end points
+            segment_start = stream_linestring.GetPoint(int(snap_results[snap_index].segment))
+            segment_end = stream_linestring.GetPoint(int(snap_results[snap_index].segment + 1))
+            # Get the geometry of the snapped point
+            snapped_point_geom = snapped_points[snap_index][0].GetGeometryRef()
+            # Create the perpendicular line through the snapped point
+            offset, t, x3, x4, y3, y4 = create_perpendicular_lines(
+                snapped_point_geom, None, segment_start, segment_end, is_snapped_point=True, length=length)
+            perpendicular_lines.append((offset, t, x3, x4, y3, y4))
+            snap_index += 1
+     
+        else:
+            # Create a regular perpendicular line
+            offset, t, x3, x4, y3, y4 = create_perpendicular_lines(
+                point1_geometry, point2_geometry, None, None, is_snapped_point=False, length=length)
+            perpendicular_lines.append((offset, t, x3, x4, y3, y4))
         
-        perpendicular_lines.append((offset, t, x3, x4, y3, y4))
+        #print(perpendicular_lines)
 
-    return perpendicular_lines, offset, t, x3, x4, y3, y4
+    return perpendicular_lines #, offset, t, x3, x4, y3, y4
 
-def give_profile_to_segments(segment_linestring, points_with_profiles):
+
+def interpolate_perpendicular_lines_from_sp(snapped_points, perpendicular_lines): #, previous_perpendicular_line, output_lines_layer):
     """
-    Associate profiles with segments based on their proximity.
+    Generate interpolated lines from intersecting snapped points
     
-    :param segment_linestring: The segment represented as a linestring.
-    :param points_with_profiles: List of points associated with profiles.
-    :return: Closest point and its associated profile type.
-    """
-    #find the closest point to the segment.
-    min_distance = float('inf')
-    #snapped_result = None
-    closest_point = None
-    profile_type_line = None
-    for point_with_profile in points_with_profiles:
-        point_feature, profile_type, regulativstationering = point_with_profile
-        point = point_feature.GetGeometryRef().Clone()
-
-        #snapping operation
-        point_np = np.array([point.GetPoint()[:2]])
-        snap_result = snap_points(point_np, segment_linestring)[0] 
-        #print(snap_result)
-        # assuming offset gives us the distance ?
-        if abs(snap_result.offset) < min_distance:
-            min_distance = abs(snap_result.offset)
-            closest_point = point_feature
-            #print(closest_point)
-            profile_type_line = profile_type
-            # print(segment_linestring)
-            # segment_start_point = np.array(segment_linestring.GetPoint(snap_result.segment))
-            # segment_end_point = np.array(segment_linestring.GetPoint(snap_result.segment + 1))
-            # segment_vector = segment_end_point - segment_start_point
-
-            # closest_point_on_segment = segment_start_point + snap_result.param * segment_vector
-            # closest_segment_point = ogr.Geometry(ogr.wkbPoint)
-            # closest_segment_point.AddPoint(*closest_point_on_segment)
-            
-
-    #return closest_segment_point, profile_type_line
-
-    return closest_point, profile_type_line
-    #return start_point, end_point, start_profile_type, end_profile_type
-
-
-########## New functions to handle the data from the new snapping function ###########
-
-def find_closest_perpendicular_line(snapped_point, perp_lines):
-    """
-    Find the perpendicular line closest to the given point created using snapping.
-
-    :param point: The point with profile information.
-    :param perp_lines: List of perpendicular lines with their attributes.
-    :return: Index of the closest perpendicular line.
-    """
-    min_distance = float('inf')
-    closest_index = None
-    for i, (_, _, x3, x4, y3, y4) in enumerate(perp_lines):
-        # Calculate the distance from the point to this perpendicular line
-        # and update min_distance and closest_index accordingly
-        min_distance = 0
-
-    return closest_index
-
-def assign_profiles_to_lines(points_with_profiles, perp_lines):
-    """
-    Assign profiles to perpendicular lines that intersect specific points.
-
-    :param points_with_profiles: Points along the polyline with profile information.
-    :param perp_lines: List of perpendicular lines.
-    :return: Updated list of perpendicular lines with profile information.
-    """
-    for point, profile in points_with_profiles:
-        closest_index = find_closest_perpendicular_line(point, perp_lines)
-        if closest_index is not None:
-            perp_lines[closest_index]['profile'] = profile
-    return perp_lines
-
-def create_lines_from_perp_lines(line_profiles, offset, t, x3, x4, y3, y4, previous_perpendicular_line, output_lines_layer):
-    """
-    Generate interpolated lines from given perpendicular lines.
-    
-    :param line_profiles: List of profiles.
-    :param offset, t, x3, x4, y3, y4: Attributes of the perpendicular lines.
-    :param previous_perpendicular_line: The last generated perpendicular line.
+    :param snapped_points: List of snapped points with profile data.
+    :param perpendicular_lines: List of perpendicular lines and their attributes.
     :param output_lines_layer: The layer where output lines should be saved.
     :return: The list of generated perpendicular points.
     """
-    #  # Interpolate Z values
-    # if profile:
-    #     # If the line has a profile, use it to interpolate Z values
-    #     z_values = profile.interp(offset)
-    # else:
-    #     # For lines without a profile, interpolate based on the nearest profiles
-    #     # This requires logic to find the nearest profiles and interpolate Z values
-    #     # ...
 
-    # Interpolate Z values from points based on the class
-    z1_values = line_profiles.interp(offset)  # returns an array of Z values for profile 
-    # Create a perpendicular normalized line from the interpolated points
-    perpendicular_points = []
-    for i in range(len(t)):
-
-        # Calculate coordinates and interpolated z-values for each point
-        x_curr = t[i] * (x4-x3) + x3
-        y_curr = t[i] * (y4-y3) + y3
-        z_curr = z1_values[i]
-        perpendicular_points.append((x_curr, y_curr, z_curr))
-
-        # Linear interpolation between start_point and end_point
-        # fraction = i / len(t)
-        # z_curr = (1 - fraction) * start_z_value + fraction * end_z_value
-        # perpendicular_points.append((x_curr, y_curr, z_curr))
+    offset, t, x3, x4, y3, y4, = perpendicular_lines
+    # Create a LineString geometry for the perpendicular line
+    perp_line_geom = ogr.Geometry(ogr.wkbLineString)
+    perp_line_geom.AddPoint(x3, y3)
+    perp_line_geom.AddPoint(x4, y4)
 
 
-    if previous_perpendicular_line:  # Only draw lines if there was a previous line
-        for j in range(len(t)):  
+    intersecting_points_z = []
+
+    for point_feature, profile_type, regulativstationering in snapped_points:        
+        if point_feature.GetGeometryRef().Intersects(perp_line_geom):
+                
+            profile = get_profile(point_feature, profile_type)
+            z_values = profile.interp(offset)
+            intersecting_points_z.extend([(t[j] * (x4 - x3) + x3, t[j] * (y4 - y3) + y3, z_values[j]) for j in range(len(t))])
+
+    return intersecting_points_z
+
+
+def sort_segments(segments):
+    # sorted_segments = get_layer_topology(segments)
+    # print(sorted_segments)
+    # return sorted_segments
+    # Sort segments based on starting x-coordinate, then by starting y-coordinate
+    return sorted(segments, key=lambda segment: (segment[0][0], segment[0][1]))
+
+
+def create_lines_with_z(perpendicular_points, previous_perpendicular_line, output_lines_layer):
+   
+    for j, point2 in enumerate(perpendicular_points):
+        #print(point2)
+        if previous_perpendicular_line is not None:  # Only draw lines if there was a previous line
             point1 = previous_perpendicular_line[j]
-            point2 = perpendicular_points[j]
-
-            # Check if z coordinate is NaN
-            if np.isnan(point1[2]) or np.isnan(point2[2]):
-                continue
-        
-            # Interpolate Z-values between the two points
-            z_values = np.linspace(point1[2], point2[2], 2)
-            #print(z_values)
-
-            # Existing Z-values (start and end)
-            #z_values = [point1[2], point2[2]]
-
-            # Interpolated Z-values
-            #z_interpolated = np.interp([0, 1], [0, 1], z_values)
-
+            #print(point1)
             line_geometry = ogr.Geometry(ogr.wkbLineString25D)
-            # line_geometry.AddPoint(point1[0], point1[1], float(point1[2]))
-            # line_geometry.AddPoint(point2[0], point2[1], float(point2[2]))
-
-            line_geometry.AddPoint(point1[0], point1[1], float(z_values[0]))
-            line_geometry.AddPoint(point2[0], point2[1], float(z_values[1]))
-
+            line_geometry.AddPoint(point1[0], point1[1], float(point1[2]))
+            line_geometry.AddPoint(point2[0], point2[1], float(point2[2]))
+            #print(line_geometry)
             # Create output feature for crosssections
             output_line_feature = ogr.Feature(output_lines_layer.GetLayerDefn())
             output_line_feature.SetGeometry(line_geometry)
             output_lines_layer.CreateFeature(output_line_feature)
-
-    return perpendicular_points
-
-################ Sorting function of vandløbsmidte segments
-
-def sort_segments(segments):
-    # Sort segments based on starting x-coordinate, then by starting y-coordinate
-    return sorted(segments, key=lambda segment: (segment[0][0], segment[0][1]))
+            #print(output_lines_layer)
 
 def main():
     """
@@ -298,17 +298,6 @@ def main():
     input_polyline_layer = input_polyline_datasrc.GetLayer()
     input_polyline_feature = input_polyline_layer.GetNextFeature()
 
-    segments = []
-    for input_polyline_feature in input_polyline_layer:
-        stream_linestring = input_polyline_feature.GetGeometryRef()
-
-        linestring_points = np.array(stream_linestring.GetPoints())[:,:2]
-    
-        for i in range(len(linestring_points) - 1):
-            segment = (linestring_points[i], linestring_points[i+1])
-            segments.append(segment)
-
-    segments = sort_segments(segments)
 
     points = []
     for input_points_path, profile_type in [(input_points_simpel_path, 'RegulativProfilSimpel')]: #, (input_points_sammensat_path, 'RegulativProfilSammensat'), (input_points_opmaalt_path, 'OpmaaltProfil')]:
@@ -323,17 +312,6 @@ def main():
     # Sort points by 'regulativstationering'
     points_sorted = sorted(points, key=lambda x: x[2])
 
-    #points_sorted = sorted(points, key=itemgetter(2))
-    # print("points",points)
-    # print("sorted",points_sorted)
-    
-    # nearest_points_for_segments = {}
-    # for segment in segments:
-    #     upstream, downstream = find_nearest_upstream_downstream(segment, points_sorted)
-    #     nearest_points_for_segments[segment] = (upstream, downstream)
-
-
-
     #create the output file
     output_lines_driver = ogr.GetDriverByName("gpkg")
     output_lines_datasrc = output_lines_driver.CreateDataSource(output_lines_path)
@@ -344,32 +322,51 @@ def main():
     )
     output_lines_layer = output_lines_datasrc.GetLayer()
 
-    #create lists to store perpendicular lines in
+
+    last_offsets = []
+    last_z_values = []
     previous_perpendicular_line = None
 
-    # Loop over all segments
-    for segment in segments:
-        #convert segment to LineString
-        segment_linestring = ogr.Geometry(ogr.wkbLineString)
-        segment_linestring.AddPoint(*segment[0])
-        segment_linestring.AddPoint(*segment[1])
+    # Process each polyline feature
+    for input_polyline_feature in input_polyline_layer:
+        stream_linestring = input_polyline_feature.GetGeometryRef()
 
-        #find the closest point and its profile for each segment
-        closest_point, profile_type_line = give_profile_to_segments(segment_linestring, points_sorted)
-        (print(closest_point))
-        perpendicular_lines, offset, t, x3, x4, y3, y4 = create_perpendicular_lines_on_polylines(segment_linestring, length=30, interval=1)
-                
-        #associate each perpendicular line with a profile
-        line_profiles = []
+        # Snapping points to this polyline
+        snapped_points, snap_results = create_snapped_points(stream_linestring, points_sorted)
+
+        # Create perpendicular lines for this polyline
+        perpendicular_lines = create_perpendicular_lines_on_polylines(stream_linestring, snapped_points, snap_results, length=30, interval=1)
+ 
+        # Interpolating and creating lines for each perpendicular line
         for perp_line in perpendicular_lines:
-            line_profiles.append((perp_line, get_profile(closest_point, profile_type_line)))
+            current_perpendicular_points = interpolate_perpendicular_lines_from_sp(snapped_points, perp_line)
             
+            if current_perpendicular_points:
+                last_offsets.append(perp_line[0])
+                last_z_values.extend([point[2] for point in current_perpendicular_points])
+                #print(last_z_values)
+            
+            else:
+                # Handle non-intersecting lines
+                offset, t, x3, x4, y3, y4 = perp_line
+                offset_flat = np.array(offset).flatten()
                 
-        profiles = get_profile(closest_point, profile_type_line)
-        
-        previous_perpendicular_line = create_lines_from_perp_lines(profiles, offset, t, x3, x4, y3, y4, previous_perpendicular_line, output_lines_layer)
-            
-        
+                if last_offsets and last_z_values:
+                    interpolated_z_values = np.interp(offset_flat, np.array(last_offsets).flatten(), np.array(last_z_values).flatten())
+                    #print(interpolated_z_values)
+                    current_perpendicular_points = [(t[j] * (x4 - x3) + x3, t[j] * (y4 - y3) + y3, interpolated_z_values[j]) for j in range(len(t))]
+                
+                #else:
+                    # Handle case where no known Z values are available
+                    #current_perpendicular_points= [(t[j] * (x4 - x3) + x3, t[j] * (y4 - y3) + y3, 999) for j in range(len(t))]  # Default Z value
+                
+           
+            if previous_perpendicular_line:
+                create_lines_with_z(current_perpendicular_points, previous_perpendicular_line, output_lines_layer)
+                breakpoint()
+
+            previous_perpendicular_line = current_perpendicular_points
+
     logging.info(f"processed {len(points)} points and created lines")
 
     output_lines_datasrc = None
