@@ -3,9 +3,8 @@ import numpy as np
 import argparse
 import logging
 from rivertopo.profile import RegulativProfilSimpel, RegulativProfilSammensat, OpmaaltProfil # import interpolation classes
-from snapping import snap_points
+from rivertopo.snapping import snap_points
 from numpy import array_equal
-from topology import *
 import shapely
 
 """
