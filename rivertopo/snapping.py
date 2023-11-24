@@ -9,6 +9,16 @@ ogr.UseExceptions()
 SnapResult = namedtuple('SnapResult', ['segment', 'param', 'offset'])
 
 def snap_points(points, linestring):
+    """
+    For an array of points, find their nearest locations on a given linestring
+    geometry.
+
+    :param points: Array of point coordinates to snap
+    :type points: N-by-2 array (further columns are acceptable)
+    :param linestring: LineString geometry to snap to
+    :type linestring: ogr.Geometry
+    """
+
     linestring_points = np.array(linestring.GetPoints())[:,:2]
     linestring_startpoints = linestring_points[:-1,:]
     linestring_endpoints = linestring_points[1:,:]
