@@ -15,11 +15,11 @@ The profile points are projected unto the stream centerline as reference for the
 
 *Example of adjustment of generated 3d lines in DEM*
 
-![exampel](images\Slide2.PNG)
-![exampel](images\Slide3.PNG)
-![exampel](images\Slide4.PNG)
-![exampel](images\Slide5.PNG)
-![exampel](images\Slide6.PNG)
+![exampel](images/Slide2.PNG)
+![exampel](images/Slide3.PNG)
+![exampel](images/Slide4.PNG)
+![exampel](images/Slide5.PNG)
+![exampel](images/Slide6.PNG)
 
 
 ## Installation
