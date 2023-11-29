@@ -34,7 +34,7 @@ def calculate_center(geometry_ref):
 
     return thalweg_coord
 
-def calculate_stationing(linestring, snap_results):
+def calculate_chainage(linestring, snap_results):
     """
     Calculate the stationing (distance along the linestring) for each snapped point.
     
@@ -277,7 +277,7 @@ def main():
             all_snap_results.append(snapping_results)
 
         station_to_profile_map = {}
-        stations = calculate_stationing(stream_linestring, all_snap_results)
+        stations = calculate_chainage(stream_linestring, all_snap_results)
 
         for station_value, point_info, snap_result in zip(stations, points_sorted, all_snap_results):
             point_feature, profile_type, regulativstationering = point_info
