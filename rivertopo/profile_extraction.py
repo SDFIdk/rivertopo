@@ -2,14 +2,11 @@
 from osgeo import gdal, ogr
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
-from scipy import interpolate
 from collections import namedtuple
 import argparse
-#import logging
-import csv
 import os
 
-from rivertopo.cross_lines_z import create_perpendicular_lines, create_perpendicular_lines_on_polylines
+from rivertopo.cross_lines_z import create_perpendicular_lines
 
 gdal.UseExceptions()
 ogr.UseExceptions()
@@ -157,6 +154,48 @@ def get_raster_interpolator(dataset):
     
     return interpolator
 
+
+def create_perpendicular_lines_at_interval(stream_linestring, length=20, interval=20):
+    """
+    Create perpendicular lines over a given polyline at specified intervals.
+    
+    :param stream_linestring: The input stream linestring.
+    :param length: Length of the perpendicular line (default is 30 meters).
+    :param interval: Interval distance along the linestring to create perpendicular lines.
+    :return: List of perpendicular lines and their attributes (including stationing distance).
+    """
+    perpendicular_lines = []
+    total_length = stream_linestring.Length()
+    next_interval_distance = interval
+
+    while next_interval_distance <= total_length:
+        # Find the segment where this interval falls
+        cumulative_distance = 0
+        for i in range(stream_linestring.GetPointCount() - 1):
+            point1 = stream_linestring.GetPoint(i)
+            point2 = stream_linestring.GetPoint(i + 1)
+
+            segment_length = np.hypot(point2[0] - point1[0], point2[1] - point1[1])
+            if cumulative_distance + segment_length >= next_interval_distance:
+                # Create a perpendicular line at this segment
+                point1_geometry = ogr.Geometry(ogr.wkbPoint)
+                point1_geometry.AddPoint(*point1)
+                point2_geometry = ogr.Geometry(ogr.wkbPoint)
+                point2_geometry.AddPoint(*point2)
+
+                offset, t, x3, x4, y3, y4 = create_perpendicular_lines(point1_geometry, point2_geometry, length=length)
+                perpendicular_lines.append((offset, t, x3, x4, y3, y4, next_interval_distance))
+                break
+
+            cumulative_distance += segment_length
+
+        # Update the next interval distance
+        next_interval_distance += interval
+
+    return perpendicular_lines
+
+
+
 def main():
     argument_parser = argparse.ArgumentParser()
     argument_parser.add_argument('input_rasters', nargs='+', type=str, help= 'input DEM raster datasets to sample')
@@ -175,21 +214,15 @@ def main():
     
     input_raster_dataset = input_raster_vrt 
 
-    #input_raster_dataset = gdal.Open(input_raster_path)
-
     input_lines_datasrc = ogr.Open(input_lines_path)
     input_lines_layer = input_lines_datasrc.GetLayer()
     input_lines_feature = input_lines_layer.GetNextFeature()
 
-    segments = []
+
     for input_lines_feature in input_lines_layer:
         stream_linestring = input_lines_feature.GetGeometryRef()
-
-        linestring_points = np.array(stream_linestring.GetPoints())[:,:2]
-
-        for i in range(len(linestring_points) - 1):
-            segment = (linestring_points[i], linestring_points[i+1])
-            segments.append(segment)
+        
+        perpendicular_lines= create_perpendicular_lines_at_interval(stream_linestring, length=20, interval=20)
 
     output_lines_driver = ogr.GetDriverByName("gpkg")
     output_lines_datasrc = output_lines_driver.CreateDataSource(output_lines_path)
@@ -199,12 +232,7 @@ def main():
         geom_type=ogr.wkbLineString25D,
     )
     output_lines_layer = output_lines_datasrc.GetLayer()
-
-    
-    # Add a new field for the segment index
-    field_defn = ogr.FieldDefn("Seg_Index", ogr.OFTInteger)
-    output_lines_layer.CreateField(field_defn)
-   
+ 
     # Prepare data storage
     all_lines_data = {
         'line_ids': [],
@@ -213,74 +241,65 @@ def main():
         'z_values': [],
         'distances': [],
     }
-    # Loop over all segments
-    for segment_index, segment in enumerate(segments):
-        #convert segment to LineString
-        segment_linestring = ogr.Geometry(ogr.wkbLineString)
-        segment_linestring.AddPoint(*segment[0])
-        segment_linestring.AddPoint(*segment[1])
+    
+    for perp_line in perpendicular_lines:
+        offset, t, x3, x4, y3, y4, perp_line_station = perp_line     
+     
+        # Create an array of x and y coordinates along the line
+        x_coords = np.linspace(x3, x4, num=50)
+        y_coords = np.linspace(y3, y4, num=50)
 
-        perpendicular_lines, offset, t, x3, x4, y3, y4 = create_perpendicular_lines_on_polylines(segment_linestring, length=30, interval=1)
-            
-        # Create the LineString for the perpendicular line and add it to the output layer
-        for offset, t, x3, x4, y3, y4 in perpendicular_lines:
-                
-            # Create an array of x and y coordinates along the line
-            x_coords = np.linspace(x3, x4, num=50)
-            y_coords = np.linspace(y3, y4, num=50)
+        # Create bounding box encompassing the entire line
+        input_line_bbox = BoundingBox(
+            x_min=min(x_coords),
+            x_max=max(x_coords),
+            y_min=min(y_coords),
+            y_max=max(y_coords)
+        )
 
-            # Create bounding box encompassing the entire line
-            input_line_bbox = BoundingBox(
-                x_min=min(x_coords),
-                x_max=max(x_coords),
-                y_min=min(y_coords),
-                y_max=max(y_coords)
-            )
+        # Get a raster window just covering this line object
+        window_raster_dataset = get_raster_window(input_raster_dataset, input_line_bbox)
 
-            # Get a raster window just covering this line object
-            window_raster_dataset = get_raster_window(input_raster_dataset, input_line_bbox)
+        # Prepare the interpolator
+        window_raster_interpolator = get_raster_interpolator(window_raster_dataset)
 
-            # Prepare the interpolator
-            window_raster_interpolator = get_raster_interpolator(window_raster_dataset)
-
-            # Interpolate z values along the line
-            z_values = window_raster_interpolator((x_coords, y_coords))
+        # Interpolate z values along the line
+        z_values = window_raster_interpolator((x_coords, y_coords))
            
-            # Create a new line geometry, including z values
-            line_geometry = ogr.Geometry(ogr.wkbLineString25D)
-            for x, y, z in zip(x_coords, y_coords, z_values):
-                line_geometry.AddPoint(x, y, z)
+        # Create a new line geometry, including z values
+        line_geometry = ogr.Geometry(ogr.wkbLineString25D)
+        for x, y, z in zip(x_coords, y_coords, z_values):
+            line_geometry.AddPoint(x, y, z)
 
-            # Calculate the distances for each row
-            distances = [0]  # Initialize with the first distance as 0
-            for i in range(1, len(x_coords)):
-                dx = x_coords[i] - x_coords[i-1]
-                dy = y_coords[i] - y_coords[i-1]
-                distance = np.sqrt(dx**2 + dy**2) + distances[-1]
-                distances.append(distance)
+        # Calculate the distances for each row
+        distances = [0]  # Initialize with the first distance as 0
+        for i in range(1, len(x_coords)):
+            dx = x_coords[i] - x_coords[i-1]
+            dy = y_coords[i] - y_coords[i-1]
+            distance = np.sqrt(dx**2 + dy**2) + distances[-1]
+            distances.append(distance)
 
-            feature = ogr.Feature(output_lines_layer.GetLayerDefn())
-            feature.SetField("Seg_Index", segment_index)
-            feature.SetGeometry(line_geometry)
-            output_lines_layer.CreateFeature(feature)
-            feature = None
+        feature = ogr.Feature(output_lines_layer.GetLayerDefn())
+        feature.SetGeometry(line_geometry)
+        output_lines_layer.CreateFeature(feature)
+        feature = None
 
-            # Store the line data
-            line_id = f'segment_{segment_index}'
-            all_lines_data['line_ids'].append([line_id] * len(x_coords))
-            all_lines_data['x_coords'].append(x_coords)
-            all_lines_data['y_coords'].append(y_coords)
-            all_lines_data['z_values'].append(z_values)
-            all_lines_data['distances'].append(distances)
+        # Store the line data
+        line_id = f'segment_{perp_line_station}'
+        all_lines_data['line_ids'].append([line_id] * len(x_coords))
+        all_lines_data['x_coords'].append(x_coords)
+        all_lines_data['y_coords'].append(y_coords)
+        all_lines_data['z_values'].append(z_values)
+        all_lines_data['distances'].append(distances)
         
-        concatenated_data = {}
-        for key in all_lines_data:
-            concatenated_data[key] = np.concatenate(all_lines_data[key])
+    concatenated_data = {}
+    for key in all_lines_data:
+        concatenated_data[key] = np.concatenate(all_lines_data[key])
 
-        # Save to .npz
-        output_file_path = r"C:\projekter\rivertopo\tests\data\skive.npz"
+    # Save to .npz
+    output_file_path = r"C:\projekter\rivertopo\tests\data\vaerebro20.npz"
 
-        np.savez_compressed(output_file_path, **concatenated_data)
+    np.savez_compressed(output_file_path, **concatenated_data)
 
     ##### Links til inspi #####
     # https://stackoverflow.com/questions/62283718/how-to-extract-a-profile-of-value-from-a-raster-along-a-given-line
