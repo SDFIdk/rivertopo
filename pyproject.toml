@@ -1,0 +1,8 @@
+[project]
+name = "rivertopo"
+authors = [
+    {name = "Danish Agency for Data Supply and Infrastructure (SDFI)", email = "sdfi@sdfi.dk"},
+]
+description = "Tools to help combine river profile data and DEMs"
+readme = "README.md"
+license = {file = "LICENSE"}
