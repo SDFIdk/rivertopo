@@ -1,5 +1,6 @@
 [project]
 name = "rivertopo"
+version = "0.1.0"
 authors = [
     {name = "Danish Agency for Data Supply and Infrastructure (SDFI)", email = "sdfi@sdfi.dk"},
 ]
