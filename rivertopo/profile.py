@@ -1,3 +1,13 @@
+"""
+Implementation of river profile geometry.
+
+This module provides a number of classes to represent profile data of various
+types. This comprises the Danish categorizations like "regulativprofil",
+"opmålt profil" etc. The classes in this module allow abstraction of the
+underlying profile type, allowing their geometry to be queried without regard
+to profile type.
+"""
+
 from osgeo import ogr
 import scipy
 import numpy as np
@@ -8,6 +18,16 @@ ogr.UseExceptions()
 
 # TODO Add center coords, azimuth?
 class ProfilABC(metaclass=ABCMeta):
+    """
+    Abstract base class representing a river profile.
+
+    This is intended to be subclassed with "regulativprofil", "opmålt profil"
+    etc. classes. This base class provides a constructor method to construct a
+    profile directly from an OGR Feature with appropriate geometry and
+    attributes, as well as an "interp" method to query the profile geometry
+    anywhere.
+    """
+
     @abstractmethod
     def __init__(self, feature):
         pass
@@ -93,7 +113,7 @@ class OpmaaltProfil(ProfilABC):
         geometry_ref = feature.GetGeometryRef()
         geometry_coords = np.array(geometry_ref.GetPoints())
 
-        # Estimate "center" using thalweg?
+        # Determine thalweg position, to be considered the profile "center"
         z_min_indices = np.argmin(geometry_coords[:,2])
         z_min_coords = geometry_coords[z_min_indices,:].reshape(-1, 3) # the reshape is necessary when z_min_indices is a scalar
         thalweg_coord = np.mean(z_min_coords, axis=0)
