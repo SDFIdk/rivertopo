@@ -9,10 +9,9 @@ to profile type.
 """
 
 from osgeo import ogr
-import scipy
 import numpy as np
 
-from abc import ABCMeta, abstractmethod, abstractproperty
+from abc import ABCMeta, abstractmethod
 
 ogr.UseExceptions()
 
