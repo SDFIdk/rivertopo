@@ -191,7 +191,7 @@ def create_perpendicular_lines_at_interval(stream_linestring, length=20, interva
                 offset, t, x3, x4, y3, y4 = create_perpendicular_lines(point1_geometry, point2_geometry, length=length)
             
                 # Enhanced tolerance check
-                tolerance = 0.1  # Adjust tolerance as needed
+                tolerance = 0.1  
                 is_unique = not any(abs(x - x3) < tolerance and abs(y - y3) < tolerance 
                                     for _, _, x, _, y, _, _ in perpendicular_lines)
 
