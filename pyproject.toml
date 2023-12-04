@@ -7,3 +7,7 @@ authors = [
 description = "Tools to help combine river profile data and DEMs"
 readme = "README.md"
 license = {file = "LICENSE"}
+
+[project.scripts]
+cross_lines_z = "rivertopo.cross_lines_z:main"
+profile_extraction = "rivertopo.profile_extraction:main"
