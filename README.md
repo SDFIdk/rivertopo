@@ -50,7 +50,7 @@ The tools can be used for single streams with a linestring for the centerline an
 This module is made for creating ready to burn lines from cross sectional data gathered from Dataforsyningen.dk (skikkelsesdata for vandløb). 
 
 ```
-cross_lines_z_2.py input_points_simpel input_points_sammensat input_points_opmaalt input_polyline output_lines 
+cross_lines_z input_points_simpel input_points_sammensat input_points_opmaalt input_polyline output_lines 
 ```
 | Parameter | Description |
 | --------- | ----------- |
@@ -63,7 +63,7 @@ cross_lines_z_2.py input_points_simpel input_points_sammensat input_points_opmaa
 ### Burning the prepared vector objects into raster tile
 This module is made for burning the cross sectional data created in the 2d lines the above script (cross_lines_z_2.py).
 ```
-burn_line_z.py input_lines input_raster output_raster 
+burn_line_z input_lines input_raster output_raster 
 ```
 | Parameter | Description |
 | --------- | ----------- |
@@ -74,7 +74,7 @@ burn_line_z.py input_lines input_raster output_raster
 ### Profile extraction along polyline
 This module is made to extract profiles along a polyline e.g. a polyline over a streamlines mid. The output is npz files intended to use for plotting.
 ```
-profile_extraction.py input_rasters input_line output_lines 
+profile_extraction input_rasters input_line output_lines 
 ```
 | Parameter | Description |
 | --------- | ----------- |
@@ -85,7 +85,7 @@ profile_extraction.py input_rasters input_line output_lines
 ### Profile plotting using plotly module
 This module is made for 5 specific cross section files created in profile_extraction.py for 4 locations. 
 ```
-profile_plotting_v2.py ex_profiles1 ex_profiles2 ex_profiles3 ex_profiles4_line1 ex_profiles5_line2
+profile_plotting.py ex_profiles1 ex_profiles2 ex_profiles3 ex_profiles4_line1 ex_profiles5_line2
 ```
 | Parameter | Description |
 | --------- | ----------- |
@@ -112,13 +112,13 @@ As an example, the steps below illustrate preparing the relevant intermediate da
 Prepare lines with cross sectional data points:
 
 ```
-cross_lines_z_2.py test_simpel.gpkg test_sammensat.gpkg test_opmaalt.gpkg cropped_vandloebsmidte.gpkg LINES_WITH_Z.gpkg 
+cross_lines_z test_simpel.gpkg test_sammensat.gpkg test_opmaalt.gpkg cropped_vandloebsmidte.gpkg LINES_WITH_Z.gpkg 
 ```
 
 Create the adjusted DEM tile from the 3d lines and the original DEM tile:
 
 ```
-burn_line_z.py LINES_WITH_Z.gpkg ORIGINAL_DTM/1km_NNNN_EEE.tif ADJUSTED_DTM/1km_NNNN_EEE.tif 
+burn_line_z LINES_WITH_Z.gpkg ORIGINAL_DTM/1km_NNNN_EEE.tif ADJUSTED_DTM/1km_NNNN_EEE.tif 
 ```
 
 ## Example workflow (extracting and plotting profiles from DEM tile)
@@ -126,13 +126,13 @@ burn_line_z.py LINES_WITH_Z.gpkg ORIGINAL_DTM/1km_NNNN_EEE.tif ADJUSTED_DTM/1km_
 Prepare and extract profiles to a npz file on polyline:
 
 ```
-profile_extraction.py ORIGINAL_DTM/1km_NNNN_EEE.tif cropped_vandloebsmidte.gpkg 
+profile_extraction ORIGINAL_DTM/1km_NNNN_EEE.tif cropped_vandloebsmidte.gpkg 
 ```
 
 Now the npz file can be used in the plotting module. It is currently set up to plot the 5 example case files:
 
 ```
-profile_plotting_v2.py karup.csv skive.csv fiskbæk.csv indbrændt.csv indbrændt_eksempel.csv
+profile_plotting.py karup.csv skive.csv fiskbæk.csv indbrændt.csv indbrændt_eksempel.csv
 ```
 
 

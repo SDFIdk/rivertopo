@@ -11,3 +11,5 @@ license = {file = "LICENSE"}
 [project.scripts]
 cross_lines_z = "rivertopo.cross_lines_z:main"
 profile_extraction = "rivertopo.profile_extraction:main"
+burn_line_z = "rivertopo.burn_line_z:main"
+

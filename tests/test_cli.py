@@ -11,3 +11,6 @@ def test_cross_lines_z():
 
 def test_profile_extraction():
     cli_check_success(['profile_extraction', '-h'])
+
+def test_burn_line_z():
+    cli_check_success(['burn_line_z', '-h'])
