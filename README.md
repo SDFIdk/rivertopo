@@ -46,7 +46,7 @@ pytest
 
 The tools can be used for single streams with a linestring for the centerline and profile data points along this centerline, obtained from Dataforsyningen.dk
 
-### Preparing line objects for burning using cross_lines_z_2.py and cross sectional data
+### Preparing line objects for burning using cross_lines_z and cross sectional data
 This module is made for creating ready to burn lines from cross sectional data gathered from Dataforsyningen.dk (skikkelsesdata for vandløb). 
 
 ```
@@ -61,7 +61,7 @@ cross_lines_z input_points_simpel input_points_sammensat input_points_opmaalt in
 | `output_lines` | Path to file to write output elevation-sampled 3D line objects to. Will be written in gpkg format |
 
 ### Burning the prepared vector objects into raster tile
-This module is made for burning the cross sectional data created in the 2d lines the above script (cross_lines_z_2.py).
+This module is made for burning the cross sectional data created in the 2d lines the above script (cross_lines_z).
 ```
 burn_line_z input_lines input_raster output_raster 
 ```
