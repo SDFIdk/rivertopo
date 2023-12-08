@@ -21,7 +21,7 @@ This script is used to plot the .npz files found in tests\data
 def main():
     app = dash.Dash(__name__)
 
-    datafolder = os.path.relpath(r'tests\data')
+    datafolder = os.path.relpath(r'tests/data')
 
     skive_data = np.load(os.path.join(datafolder,"skive.npz"))
     fiskbaek_data = np.load(os.path.join(datafolder,"fiskbaek.npz"))
