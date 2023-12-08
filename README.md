@@ -50,7 +50,7 @@ The tools can be used for single streams with a linestring for the centerline an
 This module is made for creating ready to burn lines from cross sectional data gathered from Dataforsyningen.dk (skikkelsesdata for vandløb). 
 
 ```
-cross_lines_z_2 input_points_simpel input_points_sammensat input_points_opmaalt input_polyline output_lines 
+cross_lines_z input_points_simpel input_points_sammensat input_points_opmaalt input_polyline output_lines 
 ```
 | Parameter | Description |
 | --------- | ----------- |
@@ -112,7 +112,7 @@ As an example, the steps below illustrate preparing the relevant intermediate da
 Prepare lines with cross sectional data points:
 
 ```
-cross_lines_z_2 test_simpel.gpkg test_sammensat.gpkg test_opmaalt.gpkg cropped_vandloebsmidte.gpkg LINES_WITH_Z.gpkg 
+cross_lines_z test_simpel.gpkg test_sammensat.gpkg test_opmaalt.gpkg cropped_vandloebsmidte.gpkg LINES_WITH_Z.gpkg 
 ```
 
 Create the adjusted DEM tile from the 3d lines and the original DEM tile:

@@ -14,3 +14,6 @@ def test_profile_extraction():
 
 def test_burn_line_z():
     cli_check_success(['burn_line_z', '-h'])
+
+def test_profile_plotting():
+    cli_check_success(['profile_plotting', '-h'])
