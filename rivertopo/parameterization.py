@@ -26,7 +26,6 @@ def parameterize_grid(grid_xy, linestring):
 
     dist_grid = np.full_like(grid_x, np.inf)
     feature_id_grid = np.full_like(grid_x, FEATURE_ID_NODATA, dtype=FEATURE_ID_TYPE)
-    point_id_grid = np.full_like(grid_x, POINT_ID_NODATA, dtype=POINT_ID_TYPE)
     segment_id_grid = np.full_like(grid_x, SEGMENT_ID_NODATA, dtype=SEGMENT_ID_TYPE)
     chainage_grid = np.full_like(grid_x, np.nan)
     
@@ -61,28 +60,21 @@ def parameterize_grid(grid_xy, linestring):
 
         startpoint_is_nearest = startpoint_dists < segment_dists
         segment_dists[startpoint_is_nearest] = startpoint_dists[startpoint_is_nearest]
-        #segment_dists = np.minimum(segment_dists, startpoint_dists)
 
         endpoint_is_nearest = endpoint_dists < segment_dists
         segment_dists[endpoint_is_nearest] = endpoint_dists[endpoint_is_nearest]
-        #segment_dists = np.minimum(segment_dists, endpoint_dists)
 
         is_within_segment = np.logical_and(raster_projection_params >= 0.0, raster_projection_params <= 1.0)
         segment_dists[is_within_segment] = np.minimum(segment_dists[is_within_segment], perpendicular_dists[is_within_segment])
 
         segment_dists *= left_or_right
-        segment_dists_maxabs = np.max(np.abs(segment_dists))
 
         segment_chainages = np.full((len(raster_vectors),), np.nan)
         segment_chainages[startpoint_is_nearest] = linestring_chainages[i]
         segment_chainages[endpoint_is_nearest] = linestring_chainages[i+1]
         segment_chainages[is_within_segment] = (1.0-raster_projection_params[is_within_segment])*linestring_chainages[i] + raster_projection_params[is_within_segment]*linestring_chainages[i+1]
 
-        startpoint_dists_grid = startpoint_dists.reshape(grid_x.shape)
-        endpoint_dists_grid = endpoint_dists.reshape(grid_x.shape)
-        perpendicular_dists_grid = perpendicular_dists.reshape(grid_x.shape)
         segment_dists_grid = segment_dists.reshape(grid_x.shape)
-        left_or_right_grid = left_or_right.reshape(grid_x.shape)
         segment_chainage_grid = segment_chainages.reshape(grid_x.shape)
 
         delta_x = grid_x[0,1] - grid_x[0,0]
@@ -93,7 +85,7 @@ def parameterize_grid(grid_xy, linestring):
         dist_grid[segment_is_closest] = segment_dists_grid[segment_is_closest]
         chainage_grid[segment_is_closest] = segment_chainage_grid[segment_is_closest]
         segment_id_grid[segment_is_closest] = i
-        feature_id_grid[segment_is_closest] = 0
+        feature_id_grid[segment_is_closest] = feature_id
 
         dist_maxabs = np.max(np.abs(dist_grid))
 

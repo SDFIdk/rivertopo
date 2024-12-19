@@ -2,8 +2,6 @@ import plotly.express as px
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from osgeo import gdal, ogr
-import argparse
 from shapely.geometry import Point
 import geopandas as gpd
 import dash
@@ -116,7 +114,7 @@ def main():
         profile = profile_path
                   
         # Get unique Line_IDs
-        line_ids = profile['Line_ID'].unique()
+        # line_ids = profile['Line_ID'].unique()
 
         # Create a GeoDataFrame 
         geometry = [Point(xy) for xy in zip(profile['X'], profile['Y'])]
