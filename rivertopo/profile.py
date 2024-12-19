@@ -118,13 +118,13 @@ class OpmaaltProfil(ProfilABC):
         thalweg_coord = np.mean(z_min_coords, axis=0)
 
         endpoint_left = geometry_coords[0]
-        endpoint_right = geometry_coords[-1]
+        # endpoint_right = geometry_coords[-1]
 
         # distances between endpoints
-        delta_x = endpoint_right[0] - endpoint_left[0]
-        delta_y = endpoint_right[1] - endpoint_left[1]
+        # delta_x = endpoint_right[0] - endpoint_left[0]
+        # delta_y = endpoint_right[1] - endpoint_left[1]
 
-        azimuth = np.arctan2(-delta_y, delta_x) # TODO generalize to all profile types
+        # azimuth = np.arctan2(-delta_y, delta_x) # TODO generalize to all profile types
 
         dists_from_left = np.hypot(
             geometry_coords[:,0] - endpoint_left[0],

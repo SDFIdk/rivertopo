@@ -114,7 +114,7 @@ def main():
         profile = profile_path
                   
         # Get unique Line_IDs
-        line_ids = profile['Line_ID'].unique()
+        # line_ids = profile['Line_ID'].unique()
 
         # Create a GeoDataFrame 
         geometry = [Point(xy) for xy in zip(profile['X'], profile['Y'])]

@@ -208,7 +208,7 @@ def create_lines_with_z(current_line_data, previous_line_data, output_lines_laye
         output_lines_layer.CreateFeature(output_line_feature)
 
     # Update the previous line data for the next iteration
-    previous_perpendicular_line = current_line_data
+    # previous_perpendicular_line = current_line_data
 
 
 def main():
