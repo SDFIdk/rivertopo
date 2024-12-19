@@ -6,9 +6,9 @@ from collections import namedtuple
 
 ogr.UseExceptions()
 
-SnapResult = namedtuple('SnapResult', ['segment', 'param', 'offset'])
+SnapResult = namedtuple('SnapResult', ['feature', 'segment', 'chainage', 'offset'])
 
-def snap_points(points, linestring):
+def snap_points(points, feature_id, linestring):
     """
     For an array of points, find their nearest locations on a given linestring
     geometry.
@@ -55,8 +55,9 @@ def snap_points(points, linestring):
         offset = point_dists[closest_segment_index] * np.sign(np.cross(vector_rejections[closest_segment_index], linestring_vectors[closest_segment_index]))
 
         snap_results.append(SnapResult(
+            feature=feature_id,
             segment=closest_segment_index,
-            param=linestring_vector_projparams[closest_segment_index],
+            chainage=linestring_vector_projparams[closest_segment_index],
             offset=offset,
         ))
 
