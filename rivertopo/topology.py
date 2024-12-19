@@ -51,7 +51,7 @@ def get_layer_topology(layer):
 
         # initialize
         for xy in geometry_xy_tuples:
-            if not xy in point_connections:
+            if xy not in point_connections:
                 point_connections[xy] = ConnectedPoints()
 
         # Store upstream and downstream points

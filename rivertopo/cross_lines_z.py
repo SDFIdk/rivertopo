@@ -4,7 +4,6 @@ import argparse
 import logging
 from rivertopo.profile import RegulativProfilSimpel, RegulativProfilSammensat, OpmaaltProfil # import interpolation classes
 from rivertopo.snapping import snap_points
-from numpy import array_equal
 from scipy.interpolate import RegularGridInterpolator
 
 """

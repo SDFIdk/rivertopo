@@ -2,8 +2,6 @@ import plotly.express as px
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from osgeo import gdal, ogr
-import argparse
 from shapely.geometry import Point
 import geopandas as gpd
 import dash

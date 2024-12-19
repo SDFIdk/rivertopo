@@ -1,8 +1,6 @@
-from rivertopo import topology
 from rivertopo.topology import ConnectedPoints, get_layer_topology
 
 from osgeo import ogr
-import numpy as np
 
 ogr.UseExceptions()
 

@@ -4,7 +4,6 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from collections import namedtuple
 import argparse
-import os
 
 from rivertopo.cross_lines_z import create_perpendicular_lines
 
