@@ -8,6 +8,15 @@ ogr.UseExceptions()
 
 SnapResult = namedtuple('SnapResult', ['feature', 'segment', 'param', 'offset'])
 
+def cross2d(x, y):
+    """
+    Scalar-value cross product of 2D vectors.
+
+    This used to be possible with np.cross(), but this has been deprecated with
+    NumPy 2.0+.
+    """
+    return x[..., 0] * y[..., 1] - x[..., 1] * y[..., 0]
+
 def snap_points(points, feature_id, linestring):
     """
     For an array of points, find their nearest locations on a given linestring
@@ -52,7 +61,7 @@ def snap_points(points, feature_id, linestring):
         closest_segment_index = np.argmin(point_dists)
 
         # Horizontal signed offset (negative left, positive right, as seen in the direction of the line segment)
-        offset = point_dists[closest_segment_index] * np.sign(np.cross(vector_rejections[closest_segment_index], linestring_vectors[closest_segment_index]))
+        offset = point_dists[closest_segment_index] * np.sign(cross2d(vector_rejections[closest_segment_index], linestring_vectors[closest_segment_index]))
 
         snap_results.append(SnapResult(
             feature=feature_id,
