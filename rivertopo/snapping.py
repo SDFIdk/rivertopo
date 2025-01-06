@@ -6,7 +6,7 @@ from collections import namedtuple
 
 ogr.UseExceptions()
 
-SnapResult = namedtuple('SnapResult', ['feature', 'segment', 'chainage', 'offset'])
+SnapResult = namedtuple('SnapResult', ['feature', 'segment', 'param', 'offset'])
 
 def snap_points(points, feature_id, linestring):
     """
@@ -57,7 +57,7 @@ def snap_points(points, feature_id, linestring):
         snap_results.append(SnapResult(
             feature=feature_id,
             segment=closest_segment_index,
-            chainage=linestring_vector_projparams[closest_segment_index],
+            param=linestring_vector_projparams[closest_segment_index],
             offset=offset,
         ))
 
