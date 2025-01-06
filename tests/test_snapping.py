@@ -31,4 +31,4 @@ def test_snap_points():
     assert [actual.feature for actual in snap_results] == [expected.feature for expected in expected_results]
     assert [actual.segment for actual in snap_results] == [expected.segment for expected in expected_results]
     assert np.allclose([actual.chainage for actual in snap_results], [expected.chainage for expected in expected_results])
-    assert np.allclose([actual.chainage for actual in snap_results], [expected.chainage for expected in expected_results])
+    assert np.allclose([actual.offset for actual in snap_results], [expected.offset for expected in expected_results])
