@@ -1,7 +1,7 @@
 from osgeo import ogr
 import numpy as np
 
-from rivertopo.snapping import snap_points, SnapResult
+from rivertopo.snapping import snap_points_to_linestring, SnapResult
 
 ogr.UseExceptions()
 
@@ -26,7 +26,7 @@ def test_snap_points():
         SnapResult(feature=42, segment=1, param=0.75, offset=0.5),
     ]
 
-    snap_results = snap_points(points, feature_id, linestring)
+    snap_results = snap_points_to_linestring(points, feature_id, linestring)
 
     assert [actual.feature for actual in snap_results] == [expected.feature for expected in expected_results]
     assert [actual.segment for actual in snap_results] == [expected.segment for expected in expected_results]
