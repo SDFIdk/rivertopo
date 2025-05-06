@@ -3,7 +3,7 @@ import numpy as np
 import argparse
 import logging
 from rivertopo.profile import RegulativProfilSimpel, RegulativProfilSammensat, OpmaaltProfil # import interpolation classes
-from rivertopo.snapping import snap_points
+from rivertopo.snapping import snap_points_to_linestring
 from scipy.interpolate import RegularGridInterpolator
 
 """
@@ -272,7 +272,7 @@ def main():
             point_att = point_feature.GetGeometryRef().Clone()
             points_np = np.array([point_att.GetPoint()[:2]])
         
-            snapping_results = snap_points(points_np, stream_linestring)
+            snapping_results = snap_points_to_linestring(points_np, stream_linestring)
             all_snap_results.append(snapping_results)
 
         station_to_profile_map = {}

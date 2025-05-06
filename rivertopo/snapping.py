@@ -17,7 +17,7 @@ def cross2d(x, y):
     """
     return x[..., 0] * y[..., 1] - x[..., 1] * y[..., 0]
 
-def snap_points(points, feature_id, linestring):
+def snap_points_to_linestring(points, feature_id, linestring):
     """
     For an array of points, find their nearest locations on a given linestring
     geometry.
@@ -71,3 +71,29 @@ def snap_points(points, feature_id, linestring):
         ))
 
     return snap_results
+
+def snap_points_to_linestring_layer(points_layer, linestrings_layer, buffer_dist=0.0):
+    snap_results = {} # closest snap result per point
+    for linestring_feature in linestrings_layer:
+        # get linestring bbox
+        linestring_geometry = linestring_feature.GetGeometryRef()
+        x_min, x_max, y_min, y_max = linestring_geometry.GetEnvelope()
+
+        points_layer.SetSpatialFilterRect(x_min - buffer_dist, y_min - buffer_dist, x_max + buffer_dist, y_max + buffer_dist)
+        points_xy = np.array([point_feature.GetGeometryRef().GetPoint() for point_feature in points_layer])[:, :2]
+
+        linestring_fid = linestring_feature.GetFID() # TODO should we use a particular field here?
+        linestring_snap_results = snap_points_to_linestring(points_xy, linestring_fid, linestring_geometry)
+
+        for point_xy, linestring_snap_result in zip(points_xy, linestring_snap_results):
+            if point_xy in snap_results:
+                prev_snap_result = snap_results[point_xy]
+                # Replace SnapResult for this point if we are closer in terms of left/right distance
+                if abs(linestring_snap_result.offset) < abs(prev_snap_result.offset):
+                    snap_results[point_xy] = linestring_snap_result
+            else:
+                snap_results[point_xy] = linestring_snap_result
+
+        points_layer.ResetReading()
+
+        return snap_results
