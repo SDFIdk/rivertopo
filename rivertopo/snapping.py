@@ -6,7 +6,7 @@ from collections import namedtuple
 
 ogr.UseExceptions()
 
-SnapResult = namedtuple('SnapResult', ['feature', 'segment', 'param', 'offset'])
+SnapResult = namedtuple('SnapResult', ['feature', 'segment', 'param', 'chainage', 'offset'])
 
 def cross2d(x, y):
     """
@@ -33,6 +33,8 @@ def snap_points_to_linestring(points, feature_id, linestring):
     linestring_endpoints = linestring_points[1:,:]
 
     linestring_vectors = linestring_endpoints - linestring_startpoints
+    segment_lengths = np.hypot(linestring_vectors[:,0], linestring_vectors[:,1])
+    cum_segment_lengths = np.hstack([0, np.cumsum(segment_lengths)])
 
     snap_results = []
 
@@ -60,13 +62,20 @@ def snap_points_to_linestring(points, feature_id, linestring):
         # The index of the best-fit line segment
         closest_segment_index = np.argmin(point_dists)
 
+        # How far along the matched segment we are
+        param = linestring_vector_projparams[closest_segment_index]
+
+        # Chainage (within feature) of best fit
+        chainage = cum_segment_lengths[closest_segment_index] + param * segment_lengths[closest_segment_index]
+
         # Horizontal signed offset (negative left, positive right, as seen in the direction of the line segment)
         offset = point_dists[closest_segment_index] * np.sign(cross2d(vector_rejections[closest_segment_index], linestring_vectors[closest_segment_index]))
 
         snap_results.append(SnapResult(
             feature=feature_id,
             segment=closest_segment_index,
-            param=linestring_vector_projparams[closest_segment_index],
+            param=param,
+            chainage=chainage,
             offset=offset,
         ))
 
