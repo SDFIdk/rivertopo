@@ -21,9 +21,9 @@ def test_snap_points():
     ])
 
     expected_results = [
-        SnapResult(feature=42, segment=0, param=0.28, offset=-0.2),
-        SnapResult(feature=42, segment=1, param=0.25, offset=-0.5),
-        SnapResult(feature=42, segment=1, param=0.75, offset=0.5),
+        SnapResult(feature=42, segment=0, param=0.28, chainage=1.4, offset=-0.2),
+        SnapResult(feature=42, segment=1, param=0.25, chainage=5.5, offset=-0.5),
+        SnapResult(feature=42, segment=1, param=0.75, chainage=6.5, offset=0.5),
     ]
 
     snap_results = snap_points_to_linestring(points, feature_id, linestring)
@@ -31,4 +31,5 @@ def test_snap_points():
     assert [actual.feature for actual in snap_results] == [expected.feature for expected in expected_results]
     assert [actual.segment for actual in snap_results] == [expected.segment for expected in expected_results]
     assert np.allclose([actual.param for actual in snap_results], [expected.param for expected in expected_results])
+    assert np.allclose([actual.chainage for actual in snap_results], [expected.chainage for expected in expected_results])
     assert np.allclose([actual.offset for actual in snap_results], [expected.offset for expected in expected_results])
