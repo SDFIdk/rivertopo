@@ -167,15 +167,20 @@ def create_perpendicular_lines_at_interval(stream_linestring, length=20, interva
     total_length = stream_linestring.Length()
     next_interval_distance = interval
 
+
     while next_interval_distance <= total_length:
         # Find the segment where this interval falls
         cumulative_distance = 0
+       
         for i in range(stream_linestring.GetPointCount() - 1):
             point1 = stream_linestring.GetPoint(i)
             point2 = stream_linestring.GetPoint(i + 1)
 
             segment_length = np.hypot(point2[0] - point1[0], point2[1] - point1[1])
+
+  
             if cumulative_distance + segment_length >= next_interval_distance:
+        
                 # Create a perpendicular line at this segment
                 point1_geometry = ogr.Geometry(ogr.wkbPoint)
                 point1_geometry.AddPoint(*point1)
@@ -183,16 +188,24 @@ def create_perpendicular_lines_at_interval(stream_linestring, length=20, interva
                 point2_geometry.AddPoint(*point2)
 
                 offset, t, x3, x4, y3, y4 = create_perpendicular_lines(point1_geometry, point2_geometry, length=length)
-                perpendicular_lines.append((offset, t, x3, x4, y3, y4, next_interval_distance))
+            
+                # Enhanced tolerance check
+                tolerance = 0.1  
+                is_unique = not any(abs(x - x3) < tolerance and abs(y - y3) < tolerance 
+                                    for _, _, x, _, y, _, _ in perpendicular_lines)
+
+                if is_unique:
+                    perpendicular_lines.append((offset, t, x3, x4, y3, y4, next_interval_distance))
+            
                 break
+            
 
             cumulative_distance += segment_length
 
         # Update the next interval distance
         next_interval_distance += interval
-
+        
     return perpendicular_lines
-
 
 
 def main():
